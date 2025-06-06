@@ -1,0 +1,140 @@
+name: ql_quanan
+description: "A new Flutter project."
+publish_to: 'none' 
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  http: ^1.1.0          # (dart sdk: 3.0) -- thực hiện các yêu cầu HTTP trong ứng dụng Flutter. hỗ trợ các phương thức như GET, POST, PUT, DELETE, và nhiều hơn nữa
+  path_provider: ^2.1.5 # (dart sdk: 3.4) --  tìm các thư mục trên thiết bị, như thư mục tạm thời hoặc thư mục lưu trữ của ứng dụng
+  path: ^1.9.0          # (dart sdk: 3.0) -- cung cấp các hàm giúp xử lý và thao tác với đường dẫn tệp tin, như nối đường dẫn, lấy phần mở rộng của tệp, và xác định các thành phần trong đường dẫn
+  sqflite: ^2.3.2       # (dart sdk: 3.0) -- lưu trữ dữ liệu cơ sở dữ liệu trong ứng dụng Flutter.
+  provider: ^6.1.4      # (dart sdk: 2.12)
+  flutter_staggered_animations: ^1.1.1
+  intl: ^0.18.1        # (dart sdk: 3.0) -- hỗ trợ định dạng và phân tích các giá trị ngày tháng, số, và tiền tệ trong ứng dụng Flutter
+  fluttertoast: ^8.0.9
+  
+  sqlite3: ^2.1.0
+  sqflite_common: ^2.5.3  
+  sqflite_common_ffi: ^2.3.0  # cài sqflite_common_ffi để có thể sử dụng ffi
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  carousel_slider: ^5.0.0
+  flutter_lints: ^5.0.0
+  url_launcher: ^6.3.0 # (dart sdk: 3.0) -- mở các liên kết URL trong trình duyệt hoặc ứng dụng khác trên thiết bị di động
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+
+flutter:
+
+
+  uses-material-design: true
+
+
+  assets:
+    - assets/images/DongPhongNha.jpg
+    - assets/images/logo_people.png
+    - assets/images/logo_people1.png
+
+    - assets/github_logo.png
+
+    - assets/HinhAnh/Logo.jpg
+    - assets/HinhAnh/NenDangKy.jpg
+    - assets/HinhAnh/LienHe.jpg
+    - assets/HinhAnh/KhachHang/hinh1.jpg
+    - assets/HinhAnh/KhachHang/hinh2.jpg
+    - assets/HinhAnh/KhachHang/hinh3.jpg
+    - assets/HinhAnh/KhachHang/hinh4.jpg
+    - assets/HinhAnh/KhachHang/hinh5.jpg
+    - assets/HinhAnh/KhachHang/hinh6.jpg
+    - assets/HinhAnh/KhachHang/hinh7.jpg
+    - assets/HinhAnh/KhachHang/hinh8.jpg
+    - assets/HinhAnh/KhachHang/hinh9.jpg
+    - assets/HinhAnh/KhachHang/hinh10.jpg
+    - assets/HinhAnh/KhachHang/hinh11.jpg
+    - assets/HinhAnh/KhachHang/hinh12.jpg
+    - assets/HinhAnh/KhachHang/hinh13.jpg
+    - assets/HinhAnh/KhachHang/hinh14.jpg
+    - assets/HinhAnh/KhachHang/hinh15.jpg
+    - assets/HinhAnh/KhachHang/hinh16.jpg
+    - assets/HinhAnh/KhachHang/hinh17.jpg
+    - assets/HinhAnh/KhachHang/hinh18.jpg
+    - assets/HinhAnh/KhachHang/hinh19.jpg
+    - assets/HinhAnh/KhachHang/hinh20.jpg
+    - assets/HinhAnh/KhachHang/hinh21.jpg
+    - assets/HinhAnh/KhachHang/hinh22.jpg
+
+    - assets/HinhAnh/MonAn/hinh1.jpg
+    - assets/HinhAnh/MonAn/hinh2.jpg
+    - assets/HinhAnh/MonAn/hinh3.jpg
+    - assets/HinhAnh/MonAn/hinh4.jpg
+    - assets/HinhAnh/MonAn/hinh5.jpg
+    - assets/HinhAnh/MonAn/hinh6.jpg
+    - assets/HinhAnh/MonAn/hinh7.jpg
+    - assets/HinhAnh/MonAn/hinh8.jpg
+    - assets/HinhAnh/MonAn/hinh9.jpg
+    - assets/HinhAnh/MonAn/hinh10.jpg
+    - assets/HinhAnh/MonAn/hinh11.jpg
+    - assets/HinhAnh/MonAn/hinh12.jpg
+    - assets/HinhAnh/MonAn/hinh13.jpg
+    - assets/HinhAnh/MonAn/hinh14.jpg
+    - assets/HinhAnh/MonAn/hinh15.jpg
+    - assets/HinhAnh/MonAn/hinh16.jpg
+    - assets/HinhAnh/MonAn/hinh17.jpg
+    - assets/HinhAnh/MonAn/hinh18.jpg
+    - assets/HinhAnh/MonAn/hinh19.jpg
+
+    - assets/HinhAnh/MonAn/CaKho.jpg
+    - assets/HinhAnh/MonAn/CanhChua.jpg
+    - assets/HinhAnh/MonAn/canhto.jpg
+    - assets/HinhAnh/MonAn/ComChay.jpg
+    - assets/HinhAnh/MonAn/ComGa.jpg
+    - assets/HinhAnh/MonAn/ComSuon.jpg
+    - assets/HinhAnh/MonAn/ComTam.jpg
+    - assets/HinhAnh/MonAn/GaGung.jpg
+    - assets/HinhAnh/MonAn/GaSa.jpg
+    - assets/HinhAnh/MonAn/KhoQua.jpg
+    - assets/HinhAnh/MonAn/RauDen.jpg
+    - assets/HinhAnh/MonAn/RauNgot.jpg
+    - assets/HinhAnh/MonAn/ThitKhoTieu.jpg
+    - assets/HinhAnh/MonAn/ThitTom.jpg
+    - assets/HinhAnh/MonAn/logo_home.png
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
