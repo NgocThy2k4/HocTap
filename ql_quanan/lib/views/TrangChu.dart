@@ -58,7 +58,8 @@ class _TrangChuState extends State<TrangChu> {
           children: [
             // Ví dụ code mới dùng CircleAvatar
             CircleAvatar(
-              radius: 20, // Bán kính 75 sẽ tạo ra đường kính 150 (tương đương width/height cũ)
+              radius:
+                  20, // Bán kính 75 sẽ tạo ra đường kính 150 (tương đương width/height cũ)
               backgroundImage: AssetImage('assets/HinhAnh/Logo.jpg'),
             ),
             // Image.asset(
@@ -140,7 +141,7 @@ class _TrangChuState extends State<TrangChu> {
                       ), // Ảnh tạm cho người dùng
                       // TODO: Thay bằng ảnh người dùng thực tế từ DB
                     ),
-                    SizedBox(height: 10),
+                    // SizedBox(height: 10),
                     Text(
                       user?.tenDangNhap ?? 'Khách',
                       style: TextStyle(
