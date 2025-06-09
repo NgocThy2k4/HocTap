@@ -1,5 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+// import 'package:crypto/crypto.dart'; // Import thư viện crypto
+import 'dart:convert'; // Import dart:convert cho utf8.encode
+
+
 
 Future<void> insertInitialData(Database db) async {
   // Bảng vai_tro

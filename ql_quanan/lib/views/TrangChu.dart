@@ -1,17 +1,18 @@
 // views/TrangChu.dart
 
 import 'package:flutter/material.dart';
-import 'package:carousel_slider/carousel_slider.dart'; // Thêm dependency này vào pubspec.yaml
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:provider/provider.dart';
 import '../controllers/AuthController.dart';
-import '../controllers/MonAnController.dart'; // Để lấy món ăn phổ biến
-import '../controllers/CartController.dart'; // Để quản lý giỏ hàng
-import '../models/MonAn.dart'; // Để hiển thị món ăn
+import '../controllers/MonAnController.dart';
+import '../controllers/CartController.dart';
+import '../models/MonAn.dart';
 import 'DanhSachMonAn.dart';
 import 'GioHang.dart';
-import 'ThongTinCaNhan.dart'; // Mới
-import 'TrangLienHe.dart'; // Mới
+import 'ThongTinCaNhan.dart';
+import 'TrangLienHe.dart';
 import 'auth/DangNhap.dart';
+import 'admin/AdminDashboard.dart'; // IMPORT TRANG DASHBOARD ADMIN MỚI
 
 class TrangChu extends StatefulWidget {
   @override
@@ -33,15 +34,9 @@ class _TrangChuState extends State<TrangChu> {
     setState(() {
       _isLoadingPopular = true;
     });
-    // Giả lập lấy món ăn phổ biến (ví dụ: các món có trong nhiều hóa đơn nhất)
-    // Trong thực tế bạn cần query SQL phức tạp hơn để lấy top sản phẩm bán chạy
     _mostPopularFoods = await _monAnController.fetchAllMonAn();
-    // Sắp xếp tạm thời để có vài món hiển thị, bạn cần logic từ DB
-    _mostPopularFoods.sort(
-      (a, b) => b.donGia!.compareTo(a.donGia!),
-    ); // Sắp xếp theo giá giảm dần để có vài món khác nhau
-    _mostPopularFoods =
-        _mostPopularFoods.take(5).toList(); // Lấy 5 món đầu tiên
+    _mostPopularFoods.sort((a, b) => b.donGia!.compareTo(a.donGia!));
+    _mostPopularFoods = _mostPopularFoods.take(5).toList();
     setState(() {
       _isLoadingPopular = false;
     });
@@ -51,21 +46,17 @@ class _TrangChuState extends State<TrangChu> {
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context);
     final user = authController.currentUser;
+    // Kiểm tra nếu người dùng là quản lý
+    final bool isAdmin = user != null && user.maVaiTro == 'QL';
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            // Ví dụ code mới dùng CircleAvatar
             CircleAvatar(
-              radius:
-                  20, // Bán kính 75 sẽ tạo ra đường kính 150 (tương đương width/height cũ)
+              radius: 20,
               backgroundImage: AssetImage('assets/HinhAnh/Logo.jpg'),
             ),
-            // Image.asset(
-            //   'assets/HinhAnh/Logo.jpg',
-            //   height: 40,
-            // ), // Logo nhỏ trên AppBar
             SizedBox(width: 10),
             Text(
               'Quán Ăn Ngon',
@@ -124,7 +115,7 @@ class _TrangChuState extends State<TrangChu> {
       backgroundColor: Color(0xFFFCE4EC),
       drawer: Drawer(
         child: Container(
-          color: Colors.pink[50], // Nền Drawer
+          color: Colors.pink[50],
           child: ListView(
             padding: EdgeInsets.zero,
             children: <Widget>[
@@ -136,12 +127,16 @@ class _TrangChuState extends State<TrangChu> {
                     CircleAvatar(
                       radius: 40,
                       backgroundColor: Colors.white,
-                      backgroundImage: AssetImage(
-                        'assets/HinhAnh/KhachHang/hinh1.jpg',
-                      ), // Ảnh tạm cho người dùng
                       // TODO: Thay bằng ảnh người dùng thực tế từ DB
+                      // Dựa vào maVaiTro để chọn ảnh mặc định hoặc load ảnh của user
+                      backgroundImage: AssetImage(
+                        user?.maVaiTro == 'QL'
+                            ? 'assets/HinhAnh/NhanVien/default_employee.png'
+                            : user?.maVaiTro == 'NV'
+                            ? 'assets/HinhAnh/NhanVien/default_employee.png'
+                            : 'assets/HinhAnh/KhachHang/hinh1.jpg', // Default cho khách hàng
+                      ),
                     ),
-                    // SizedBox(height: 10),
                     Text(
                       user?.tenDangNhap ?? 'Khách',
                       style: TextStyle(
@@ -164,8 +159,7 @@ class _TrangChuState extends State<TrangChu> {
                   style: TextStyle(color: Colors.pink[800]),
                 ),
                 onTap: () {
-                  Navigator.pop(context); // Close the drawer
-                  // Already on TrangChu, do nothing or refresh
+                  Navigator.pop(context);
                 },
               ),
               ListTile(
@@ -212,6 +206,66 @@ class _TrangChuState extends State<TrangChu> {
                   );
                 },
               ),
+              // HIỂN THỊ CÁC MỤC QUẢN LÝ CHỈ KHI LÀ ADMIN
+              if (isAdmin) ...[
+                Divider(color: Colors.pink[200]),
+                ListTile(
+                  leading: Icon(
+                    Icons.admin_panel_settings,
+                    color: Colors.deepPurple,
+                  ),
+                  title: Text(
+                    'Bảng Điều Khiển Quản Lý',
+                    style: TextStyle(
+                      color: Colors.deepPurple[800],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => AdminDashboard()),
+                    );
+                  },
+                ),
+                // Có thể thêm từng mục nhỏ nếu muốn, hoặc chỉ đưa vào Dashboard
+                /*
+                ListTile(
+                  leading: Icon(Icons.people_alt, color: Colors.deepPurple),
+                  title: Text('Quản Lý Nhân Viên', style: TextStyle(color: Colors.deepPurple[800])),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => QuanLyNhanVienPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.group, color: Colors.deepPurple),
+                  title: Text('Quản Lý Khách Hàng', style: TextStyle(color: Colors.deepPurple[800])),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => QuanLyKhachHangPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.restaurant, color: Colors.deepPurple),
+                  title: Text('Quản Lý Món Ăn', style: TextStyle(color: Colors.deepPurple[800])),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => QuanLyMonAnPage()),
+                    );
+                  },
+                ),
+                */
+              ],
               Divider(color: Colors.pink[200]),
               ListTile(
                 leading: Icon(Icons.logout, color: Colors.red),
@@ -309,7 +363,6 @@ class _TrangChuState extends State<TrangChu> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              // Có thể thêm giá hoặc mô tả ngắn
                             ],
                           ),
                         );
@@ -340,7 +393,6 @@ class _TrangChuState extends State<TrangChu> {
               ),
             ),
             SizedBox(height: 10),
-            // Nút "Xem Thực Đơn" hoặc một phần nhỏ của danh sách món ăn
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Center(

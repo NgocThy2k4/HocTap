@@ -157,11 +157,6 @@ class _DangKyState extends State<DangKy> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 75,
-                    backgroundImage: AssetImage('assets/HinhAnh/Logo.jpg'),
-                  ),
-                  SizedBox(height: 20),
                   Text(
                     'Tạo Tài Khoản Mới',
                     style: TextStyle(
@@ -276,7 +271,7 @@ class _DangKyState extends State<DangKy> {
                               activeColor: Color(0xFFFF6790),
                             ),
                             Text(
-                              'Đăng ký Khách hàng',
+                              'Khách hàng',
                               style: TextStyle(color: Colors.white),
                             ),
                             SizedBox(width: 20),
@@ -291,7 +286,7 @@ class _DangKyState extends State<DangKy> {
                               activeColor: Color(0xFFFF6790),
                             ),
                             Text(
-                              'Đăng ký Nhân viên',
+                              'Nhân viên',
                               style: TextStyle(color: Colors.white),
                             ),
                           ],

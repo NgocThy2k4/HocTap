@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/AuthController.dart';
 import '../TrangChu.dart'; // Trang chính sau khi đăng nhập
 import 'DangKy.dart'; // Trang đăng ký
+import 'QuenMatKhau.dart'; // <-- THÊM DÒNG NÀY
 
 class DangNhap extends StatefulWidget {
   @override
@@ -89,27 +90,19 @@ class _DangNhapState extends State<DangNhap> {
               fit: BoxFit.cover,
             ),
           ),
-          // Overlay màu mờ để dễ nhìn chữ
-          // Positioned.fill(
-          //   child: Container(color: Colors.black.withOpacity(0.1)),
-          // ),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Image.asset(
-                  //   'assets/HinhAnh/Logo.jpg', // Thay bằng logo của bạn
-                  //   height: 150,
-                  // ),
                   SizedBox(height: 80),
                   Text(
                     'Đăng Nhập',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFFF6790) // Màu chữ trắng
+                      color: Color(0xFFFF6790), // Màu chữ trắng
                     ),
                   ),
                   SizedBox(height: 30),
@@ -175,6 +168,18 @@ class _DangNhapState extends State<DangNhap> {
                                           color: Colors.white,
                                         )
                                         : Text('Đăng Nhập'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(
+                                    0xFFFF6790,
+                                  ), // Màu hồng
+                                  foregroundColor:
+                                      Colors.white, // Màu chữ trắng
+                                  padding: EdgeInsets.symmetric(vertical: 15),
+                                  textStyle: TextStyle(fontSize: 18),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                               ),
                             );
                           },
@@ -197,13 +202,10 @@ class _DangNhapState extends State<DangNhap> {
                   ),
                   TextButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Tính năng quên mật khẩu đang phát triển.',
-                          ),
-                          duration: Duration(seconds: 2),
-                        ),
+                      // Điều hướng đến trang quên mật khẩu
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => QuenMatKhau()),
                       );
                     },
                     child: Text(
