@@ -1,17 +1,19 @@
-// controllers/AuthController.dart (CẬP NHẬT)
+// controllers/AuthController.dart
 
 import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart'; // Import để sử dụng SHA256
+import 'dart:convert'; // Import để sử dụng utf8.encode
 import '../models/User.dart';
-import '../models/KhachHang.dart'; // Import KhachHang model
-import '../models/NhanVien.dart'; // Import NhanVien model
-import '../database/DatabaseHelper.dart'; // Import DatabaseHelper
+import '../models/KhachHang.dart';
+import '../models/NhanVien.dart';
+import '../database/DatabaseHelper.dart';
 
 enum AuthStatus { initial, loading, loggedIn, loggedOut, registered, error }
 
 class AuthController extends ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
   String? _errorMessage;
-  User? _currentUser; // Chứa thông tin người dùng đã đăng nhập
+  User? _currentUser;
 
   final QLQuanAnDatabaseHelper _dbHelper = QLQuanAnDatabaseHelper.instance;
 
@@ -21,16 +23,22 @@ class AuthController extends ChangeNotifier {
   bool get isAuthenticated =>
       _currentUser != null && _status == AuthStatus.loggedIn;
 
-  // Constructor để tải người dùng đã đăng nhập nếu có
   AuthController() {
     _loadCurrentUser();
   }
 
   Future<void> _loadCurrentUser() async {
-    // Logic tải người dùng từ SharedPreferences hoặc persistent storage
     // Tạm thời, giả sử không có người dùng nào được lưu
-    _status = AuthStatus.loggedOut; // Mặc định là đã đăng xuất khi khởi động
+    // Nếu bạn có lưu user session bằng SharedPreferences, hãy load ở đây
+    _status = AuthStatus.loggedOut;
     notifyListeners();
+  }
+
+  // Hàm hash mật khẩu
+  String _hashPassword(String password) {
+    var bytes = utf8.encode(password); // data being hashed
+    var digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   // Phương thức đăng nhập
@@ -44,8 +52,12 @@ class AuthController extends ChangeNotifier {
 
       if (userMap != null) {
         final user = User.fromMap(userMap);
-        // Trong thực tế, bạn sẽ hash mật khẩu và so sánh mật khẩu đã hash
-        if (user.email == email && userMap['mat_khau'] == password) {
+        final hashedPassword = _hashPassword(
+          password,
+        ); // Hash mật khẩu nhập vào để so sánh
+
+        if (user.email == email && user.matKhau == hashedPassword) {
+          // So sánh với mật khẩu đã hash trong DB
           _currentUser = user;
           _status = AuthStatus.loggedIn;
         } else {
@@ -65,119 +77,136 @@ class AuthController extends ChangeNotifier {
   }
 
   // Phương thức đăng ký
-  Future<void> register({
+  Future<bool> register({
     required String tenDangNhap,
     required String email,
-    required String password,
-    required String maVaiTro, // 'KH' hoặc 'NV'
-    String? maNhanVienTuNhap, // Chỉ dùng nếu đăng ký là nhân viên
+    required String matKhau,
+    required String maVaiTro,
   }) async {
-    _status = AuthStatus.loading;
+    _status = AuthStatus.loading; // Bắt đầu trạng thái loading
     _errorMessage = null;
     notifyListeners();
 
+    print('--- Bắt đầu đăng ký ---');
+    print('Tên đăng nhập: $tenDangNhap, Email: $email, Vai trò: $maVaiTro');
+
     try {
-      // 1. Kiểm tra email đã tồn tại trong bảng nguoi_dung
-      final existingUser = await _dbHelper.getUserByEmail(email);
-      if (existingUser != null) {
-        _errorMessage =
-            'Email này đã được đăng ký. Vui lòng sử dụng email khác.';
+      // 1. Kiểm tra email đã tồn tại
+      final existingUserByEmail = await _dbHelper.getUserByEmail(email);
+      if (existingUserByEmail != null) {
+        _errorMessage = 'Email đã tồn tại.';
         _status = AuthStatus.error;
         notifyListeners();
-        return;
+        print('Lỗi: Email đã tồn tại.');
+        return false;
       }
 
-      String newMaNguoiDung;
-      String? maLienQuan; // ma_khach_hang hoặc ma_nhan_vien
+      // 2. Kiểm tra tên đăng nhập đã tồn tại (optional, nhưng tốt cho UX)
+      final existingUserByUsername = await _dbHelper.getUserByUsername(
+        tenDangNhap,
+      );
+      if (existingUserByUsername != null) {
+        _errorMessage = 'Tên đăng nhập đã tồn tại.';
+        _status = AuthStatus.error;
+        notifyListeners();
+        print('Lỗi: Tên đăng nhập đã tồn tại.');
+        return false;
+      }
+
+      String maLienQuan = '';
+      String prefix = '';
 
       if (maVaiTro == 'KH') {
-        // Đăng ký khách hàng
-        int nextKhNumber = await _dbHelper.getNextMaNguoiDung('KH');
-        newMaNguoiDung =
-            'KH${nextKhNumber.toString().padLeft(2, '0')}'; // VD: KH01, KH02...
-        maLienQuan = newMaNguoiDung; // ma_khach_hang trùng với ma_nguoi_dung
+        prefix = 'KH';
+        int nextIdNum = await _dbHelper.getNextMaNguoiDung(prefix);
+        maLienQuan =
+            '$prefix${nextIdNum.toString().padLeft(2, '0')}'; // VD: KH01, KH02
 
-        // Thêm vào bảng khach_hang
-        final khachHang = KhachHang(
-          maKhachHang: newMaNguoiDung,
+        print('Đăng ký khách hàng. maLienQuan: $maLienQuan');
+
+        // CHÈN KHACHHANG VÀO DATABASE TRƯỚC
+        KhachHang newKhachHang = KhachHang(
+          maKhachHang: maLienQuan,
           tenKhachHang: tenDangNhap,
-          hinhAnh: 'hinh1.jpg', // Ảnh mặc định
-          diaChi: '', // Có thể cho phép nhập sau
-          dienThoai: '', // Có thể cho phép nhập sau
+          diaChi: '',
+          dienThoai: '',
+          hinhAnh:
+              'default_customer.png', // Đảm bảo ảnh này tồn tại trong assets/HinhAnh
           ghiChu: '',
         );
-        await _dbHelper.insertKhachHang(khachHang.toMap());
+        print('Đang chèn KhachHang: ${newKhachHang.toMap()}');
+        await _dbHelper.insertKhachHang(newKhachHang.toMap());
+        print('Chèn KhachHang thành công.');
       } else if (maVaiTro == 'NV') {
-        // Đăng ký nhân viên
-        if (maNhanVienTuNhap == null || maNhanVienTuNhap.isEmpty) {
-          _errorMessage = 'Vui lòng nhập mã nhân viên.';
-          _status = AuthStatus.error;
-          notifyListeners();
-          return;
-        }
+        prefix = 'NV';
+        int nextIdNum = await _dbHelper.getNextMaNguoiDung(prefix);
+        maLienQuan =
+            '$prefix${nextIdNum.toString().padLeft(2, '0')}'; // VD: NV01, NV02
 
-        // Kiểm tra mã nhân viên đã có trong bảng nhan_vien chưa
-        final nhanVienData = await _dbHelper.getNhanVienByMa(maNhanVienTuNhap);
-        if (nhanVienData == null) {
-          _errorMessage = 'Mã nhân viên này không tồn tại trong hệ thống.';
-          _status = AuthStatus.error;
-          notifyListeners();
-          return;
-        }
+        print('Đăng ký nhân viên. maLienQuan: $maLienQuan');
 
-        // Kiểm tra mã nhân viên này đã được đăng ký tài khoản người dùng chưa
-        final existingUserByMaNV = await _dbHelper.getUserByMaNguoiDung(
-          maNhanVienTuNhap,
+        // CHÈN NHANVIEN VÀO DATABASE TRƯỚC
+        NhanVien newNhanVien = NhanVien(
+          maNhanVien: maLienQuan,
+          tenNhanVien: tenDangNhap,
+          chucVu:
+              'Nhân viên mới', // Cần thiết lập giá trị mặc định hoặc cho phép nhập
+          diaChi: '',
+          dienThoai: '',
+          hinhAnh:
+              'default_employee.png', // Đảm bảo ảnh này tồn tại trong assets/HinhAnh
+          ghiChu: '',
         );
-        if (existingUserByMaNV != null) {
-          _errorMessage = 'Mã nhân viên này đã được đăng ký tài khoản.';
-          _status = AuthStatus.error;
-          notifyListeners();
-          return;
-        }
-
-        newMaNguoiDung = maNhanVienTuNhap; // Ma_nguoi_dung sẽ là ma_nhan_vien
-        maLienQuan = newMaNguoiDung; // ma_nhan_vien trùng với ma_nguoi_dung
-
-        // Cập nhật thông tin nhân viên nếu cần (ví dụ: gán email)
-        // Hiện tại không cần cập nhật thêm, vì thông tin chính đã có trong bảng nhan_vien
-        // và chỉ cần liên kết người dùng với mã nhân viên đó.
-        // Bạn có thể thêm logic cập nhật email, etc. nếu cần.
+        print('Đang chèn NhanVien: ${newNhanVien.toMap()}');
+        await _dbHelper.insertNhanVien(newNhanVien.toMap());
+        print('Chèn NhanVien thành công.');
       } else {
-        _errorMessage = 'Loại vai trò không hợp lệ.';
+        _errorMessage = 'Vai trò không hợp lệ hoặc không được phép đăng ký.';
         _status = AuthStatus.error;
         notifyListeners();
-        return;
+        print('Lỗi: Vai trò không hợp lệ.');
+        return false;
       }
 
-      // Thêm người dùng mới vào bảng nguoi_dung
-      final newUser = User(
-        maNguoiDung: newMaNguoiDung,
+      // Hash mật khẩu trước khi lưu vào DB
+      final hashedPassword = _hashPassword(matKhau);
+      print('Mật khẩu đã hash: $hashedPassword');
+
+      // Tạo User và chèn vào database
+      User newUser = User(
+        maNguoiDung:
+            maLienQuan, // ma_nguoi_dung và ma_lien_quan giống nhau khi đăng ký
         tenDangNhap: tenDangNhap,
+        matKhau: hashedPassword, // Sử dụng mật khẩu đã hash
         email: email,
         maVaiTro: maVaiTro,
         maLienQuan: maLienQuan,
       );
+      print('Đang chèn User: ${newUser.toMap()}');
       await _dbHelper.insertUser(newUser.toMap());
+      print('Chèn User thành công.');
 
-      _currentUser = newUser; // Đặt người dùng hiện tại là người vừa đăng ký
-      _status = AuthStatus.registered;
-    } catch (e) {
-      _errorMessage = 'Đã xảy ra lỗi khi đăng ký: ${e.toString()}';
-      _status = AuthStatus.error;
-    } finally {
+      _status = AuthStatus.registered; // Cập nhật trạng thái thành công
+      _currentUser = newUser; // Cập nhật người dùng hiện tại
+      _errorMessage = null;
       notifyListeners();
+      print('--- Đăng ký hoàn tất thành công ---');
+      return true;
+    } catch (e) {
+      _errorMessage = 'Đã xảy ra lỗi khi đăng ký: $e';
+      _status = AuthStatus.error;
+      notifyListeners();
+      print('LỖI ĐĂNG KÝ NGOẠI LỆ: $e'); // In ra lỗi chi tiết
+      return false;
     }
   }
 
-  // Đăng xuất
   void logout() {
     _currentUser = null;
     _status = AuthStatus.loggedOut;
     notifyListeners();
   }
 
-  // Đặt lại trạng thái lỗi
   void resetError() {
     _errorMessage = null;
     if (_status == AuthStatus.error) {
@@ -186,7 +215,6 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Thêm vào AuthController:
   void updateCurrentUser(User user) {
     _currentUser = user;
     notifyListeners();

@@ -1,4 +1,4 @@
-// views/auth/DangKy.dart (CẬP NHẬT)
+// views/auth/DangKy.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -14,14 +14,12 @@ class DangKy extends StatefulWidget {
 
 class _DangKyState extends State<DangKy> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController =
-      TextEditingController(); // Thêm tên đăng nhập
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
-  final TextEditingController _employeeIdController =
-      TextEditingController(); // Mã nhân viên
+  // _employeeIdController không cần thiết nếu logic tạo mã được xử lý trong AuthController
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -76,19 +74,6 @@ class _DangKyState extends State<DangKy> {
     return null;
   }
 
-  String? _validateEmployeeId(String? value) {
-    if (_selectedUserType == UserType.employee) {
-      if (value == null || value.isEmpty) {
-        return 'Vui lòng nhập mã nhân viên.';
-      }
-      // Bạn có thể thêm regex hoặc các kiểm tra định dạng khác cho mã nhân viên
-      // if (!RegExp(r'^NV\d{2}$').hasMatch(value)) {
-      //   return 'Mã nhân viên không hợp lệ (ví dụ: NV01).';
-      // }
-    }
-    return null;
-  }
-
   void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       final authController = Provider.of<AuthController>(
@@ -96,17 +81,14 @@ class _DangKyState extends State<DangKy> {
         listen: false,
       );
       String maVaiTro = _selectedUserType == UserType.customer ? 'KH' : 'NV';
-      String? maNhanVien =
-          _selectedUserType == UserType.employee
-              ? _employeeIdController.text
-              : null;
+
+      // Không cần maNhanVienTuNhap ở đây, logic tạo mã được xử lý trong AuthController
 
       await authController.register(
         tenDangNhap: _usernameController.text,
         email: _emailController.text,
-        password: _passwordController.text,
+        matKhau: _passwordController.text, // Mật khẩu được truyền vào đây
         maVaiTro: maVaiTro,
-        maNhanVienTuNhap: maNhanVien,
       );
 
       if (authController.status == AuthStatus.registered) {
@@ -146,7 +128,7 @@ class _DangKyState extends State<DangKy> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _employeeIdController.dispose();
+    // _employeeIdController.dispose(); // Không cần dispose nếu không dùng
     super.dispose();
   }
 
@@ -169,24 +151,16 @@ class _DangKyState extends State<DangKy> {
               fit: BoxFit.cover,
             ),
           ),
-          // Positioned.fill(
-          //   child: Container(color: Colors.black.withOpacity(0.5)),
-          // ),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Ví dụ code mới dùng CircleAvatar
                   CircleAvatar(
-                    radius: 75, // Bán kính 75 sẽ tạo ra đường kính 150 (tương đương width/height cũ)
+                    radius: 75,
                     backgroundImage: AssetImage('assets/HinhAnh/Logo.jpg'),
                   ),
-                  // Image.asset(
-                  //   'assets/HinhAnh/Logo.jpg', // Thay bằng logo của bạn
-                  //   height: 120,
-                  // ),
                   SizedBox(height: 20),
                   Text(
                     'Tạo Tài Khoản Mới',
@@ -323,22 +297,22 @@ class _DangKyState extends State<DangKy> {
                           ],
                         ),
                         SizedBox(height: 20),
-                        // Mã Nhân Viên chỉ hiển thị khi chọn Nhân viên
-                        if (_selectedUserType == UserType.employee)
-                          TextFormField(
-                            controller: _employeeIdController,
-                            style: TextStyle(color: Colors.black),
-                            decoration: InputDecoration(
-                              labelText: 'Mã nhân viên',
-                              labelStyle: TextStyle(color: Colors.grey[700]),
-                              prefixIcon: Icon(
-                                Icons.badge,
-                                color: Color(0xFFFFB2D9),
-                              ),
-                              hintText: 'Ví dụ: NV01',
-                            ),
-                            validator: _validateEmployeeId,
-                          ),
+                        // Mã Nhân Viên không cần thiết ở đây nữa
+                        // if (_selectedUserType == UserType.employee)
+                        //   TextFormField(
+                        //     controller: _employeeIdController,
+                        //     style: TextStyle(color: Colors.black),
+                        //     decoration: InputDecoration(
+                        //       labelText: 'Mã nhân viên',
+                        //       labelStyle: TextStyle(color: Colors.grey[700]),
+                        //       prefixIcon: Icon(
+                        //         Icons.badge,
+                        //         color: Color(0xFFFFB2D9),
+                        //       ),
+                        //       hintText: 'Ví dụ: NV01',
+                        //     ),
+                        //     validator: _validateEmployeeId, // Nếu vẫn muốn validate
+                        //   ),
                         SizedBox(height: 30),
                         Consumer<AuthController>(
                           builder: (context, auth, child) {
@@ -349,12 +323,25 @@ class _DangKyState extends State<DangKy> {
                                     auth.status == AuthStatus.loading
                                         ? null
                                         : _handleRegister,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFFFF6790),
+                                  padding: EdgeInsets.symmetric(vertical: 15),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                                 child:
                                     auth.status == AuthStatus.loading
                                         ? CircularProgressIndicator(
                                           color: Colors.white,
                                         )
-                                        : Text('Đăng Ký'),
+                                        : Text(
+                                          'Đăng Ký',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                               ),
                             );
                           },

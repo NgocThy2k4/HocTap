@@ -27,9 +27,10 @@ class QLQuanAnDatabaseHelper {
       await getDatabasesPath(),
       'ql_quan_an_final.db',
     ); // Đổi tên DB để đảm bảo tạo mới
-    return await openDatabase(path, version: 1, onCreate: _createDb);
+    return await openDatabase(path, version: 2, onCreate: _createDb);
   }
 
+  // Tăng version để cơ sở dữ liệu đc tạo lại
   Future<void> _createDb(Database db, int version) async {
     // Bảng vai_tro
     await db.execute('''
@@ -43,7 +44,7 @@ class QLQuanAnDatabaseHelper {
     await db.execute('''
       CREATE TABLE nguoi_dung (
         ma_nguoi_dung NVARCHAR(15) NOT NULL PRIMARY KEY,
-        ten_dang_nhap NVARCHAR(50) NOT NULL,
+        ten_dang_nhap NVARCHAR(50) NOT NULL UNIQUE, -- THÊM UNIQUE VÀO ĐÂY ĐỂ ĐẢM BẢO TÊN ĐĂNG NHẬP DUY NHẤT
         mat_khau NVARCHAR(255) NOT NULL,
         email NVARCHAR(100) UNIQUE NOT NULL,
         ma_vai_tro NVARCHAR(15) NOT NULL,
@@ -157,6 +158,18 @@ class QLQuanAnDatabaseHelper {
     return results.isNotEmpty ? results.first : null;
   }
 
+  // THÊM HÀM NÀY VÀO ĐÂY
+  Future<Map<String, dynamic>?> getUserByUsername(String tenDangNhap) async {
+    final db = await database;
+    List<Map<String, dynamic>> results = await db.query(
+      'nguoi_dung',
+      where: 'ten_dang_nhap = ?',
+      whereArgs: [tenDangNhap],
+    );
+    return results.isNotEmpty ? results.first : null;
+  }
+  // KẾT THÚC HÀM CẦN THÊM
+
   Future<Map<String, dynamic>?> getUserByMaNguoiDung(String maNguoiDung) async {
     final db = await database;
     List<Map<String, dynamic>> results = await db.query(
@@ -167,13 +180,60 @@ class QLQuanAnDatabaseHelper {
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<void> insertUser(Map<String, dynamic> user) async {
+  Future<int> updateUser(Map<String, dynamic> user) async {
     final db = await database;
-    await db.insert(
+    String maNguoiDung = user['ma_nguoi_dung'];
+    user.remove('mat_khau');
+
+    return await db.update(
       'nguoi_dung',
       user,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      where: 'ma_nguoi_dung = ?',
+      whereArgs: [maNguoiDung],
     );
+  }
+
+  Future<int> updateNguoiDung(Map<String, dynamic> userMap) async {
+    final db = await database;
+    String maNguoiDung = userMap['ma_nguoi_dung'];
+
+    Map<String, dynamic> updateValues = Map.from(userMap);
+
+    updateValues.remove('mat_khau');
+    updateValues.remove('ma_nguoi_dung');
+
+    updateValues.remove('ma_vai_tro');
+    updateValues.remove('ma_lien_quan');
+
+    return await db.update(
+      'nguoi_dung',
+      updateValues,
+      where: 'ma_nguoi_dung = ?',
+      whereArgs: [maNguoiDung],
+    );
+  }
+
+  Future<int> insertUser(Map<String, dynamic> user) async {
+    final db = await database;
+    List<Map<String, dynamic>> existingUser = await db.query(
+      'nguoi_dung',
+      where: 'ma_nguoi_dung = ?',
+      whereArgs: [user['ma_nguoi_dung']],
+    );
+
+    if (existingUser.isNotEmpty) {
+      Map<String, dynamic> userToUpdate = Map.from(user);
+      userToUpdate.remove('mat_khau');
+
+      return await db.update(
+        'nguoi_dung',
+        userToUpdate,
+        where: 'ma_nguoi_dung = ?',
+        whereArgs: [user['ma_nguoi_dung']],
+      );
+    } else {
+      return await db.insert('nguoi_dung', user);
+    }
   }
 
   Future<void> insertNhanVien(Map<String, dynamic> nhanVien) async {
@@ -206,20 +266,26 @@ class QLQuanAnDatabaseHelper {
 
   Future<int> getNextMaNguoiDung(String prefix) async {
     final db = await database;
-    final List<Map<String, dynamic>> result = await db.rawQuery(
-      "SELECT ma_nguoi_dung FROM nguoi_dung WHERE ma_nguoi_dung LIKE '$prefix%' ORDER BY ma_nguoi_dung DESC LIMIT 1",
+    final List<Map<String, dynamic>> result = await db.query(
+      'nguoi_dung',
+      columns: ['ma_nguoi_dung'],
+      where: 'ma_nguoi_dung LIKE ?',
+      whereArgs: ['${prefix}%'],
+      orderBy: 'ma_nguoi_dung DESC',
+      limit: 1,
     );
 
     if (result.isNotEmpty) {
-      String lastMa = result.first['ma_nguoi_dung'];
-      int lastNumber = int.parse(lastMa.substring(prefix.length));
-      return lastNumber + 1;
-    } else {
-      return 1;
+      final lastMaNguoiDung = result.first['ma_nguoi_dung'] as String;
+      final lastNumberString = lastMaNguoiDung.replaceAll(prefix, '');
+      final lastNumber = int.tryParse(lastNumberString);
+      if (lastNumber != null) {
+        return lastNumber + 1;
+      }
     }
+    return 1; // Bắt đầu từ 1 nếu không có
   }
 
-  // Thêm vào QLQuanAnDatabaseHelper
   Future<void> updateKhachHang(Map<String, dynamic> khachHang) async {
     final db = await database;
     await db.update(
@@ -250,7 +316,6 @@ class QLQuanAnDatabaseHelper {
     );
   }
 
-  // Thêm các phương thức để lấy danh sách món ăn và chi tiết món ăn
   Future<List<MonAn>> getAllMonAn() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('mon_an');
@@ -273,10 +338,4 @@ class QLQuanAnDatabaseHelper {
     }
     return null;
   }
-
-  // // Thêm vào AuthController:
-  // void updateCurrentUser(User user) {
-  //   _currentUser = user;
-  //   notifyListeners();
-  // }
 }

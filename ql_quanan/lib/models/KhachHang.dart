@@ -16,17 +16,6 @@ class KhachHang {
     this.ghiChu,
   });
 
-  factory KhachHang.fromMap(Map<String, dynamic> map) {
-    return KhachHang(
-      maKhachHang: map['ma_khach_hang'] as String,
-      tenKhachHang: map['ten_khach_hang'] as String,
-      diaChi: map['dia_chi'] as String?,
-      dienThoai: map['dien_thoai'] as String?,
-      hinhAnh: map['hinh_anh'] as String?,
-      ghiChu: map['ghi_chu'] as String?,
-    );
-  }
-
   Map<String, dynamic> toMap() {
     return {
       'ma_khach_hang': maKhachHang,
@@ -36,5 +25,16 @@ class KhachHang {
       'hinh_anh': hinhAnh,
       'ghi_chu': ghiChu,
     };
+  }
+
+  factory KhachHang.fromMap(Map<String, dynamic> map) {
+    return KhachHang(
+      maKhachHang: map['ma_khach_hang'] as String,
+      tenKhachHang: map['ten_khach_hang'] as String,
+      diaChi: map['dia_chi'] as String?,
+      dienThoai: map['dien_thoai'] as String?,
+      hinhAnh: map['hinh_anh'] as String?,
+      ghiChu: map['ghi_chu'] as String?,
+    );
   }
 }

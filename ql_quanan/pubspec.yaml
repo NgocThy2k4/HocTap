@@ -30,7 +30,7 @@ dependencies:
   carousel_slider: ^5.0.0
   flutter_lints: ^5.0.0
   url_launcher: ^6.3.0 # (dart sdk: 3.0) -- mở các liên kết URL trong trình duyệt hoặc ứng dụng khác trên thiết bị di động
-
+  crypto: ^3.0.5
 
 
 dev_dependencies:

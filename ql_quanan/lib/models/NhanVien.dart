@@ -18,18 +18,6 @@ class NhanVien {
     this.ghiChu,
   });
 
-  factory NhanVien.fromMap(Map<String, dynamic> map) {
-    return NhanVien(
-      maNhanVien: map['ma_nhan_vien'] as String,
-      tenNhanVien: map['ten_nhan_vien'] as String,
-      chucVu: map['chuc_vu'] as String?,
-      diaChi: map['dia_chi'] as String?,
-      dienThoai: map['dien_thoai'] as String?,
-      hinhAnh: map['hinh_anh'] as String?,
-      ghiChu: map['ghi_chu'] as String?,
-    );
-  }
-
   Map<String, dynamic> toMap() {
     return {
       'ma_nhan_vien': maNhanVien,
@@ -40,5 +28,17 @@ class NhanVien {
       'hinh_anh': hinhAnh,
       'ghi_chu': ghiChu,
     };
+  }
+
+  factory NhanVien.fromMap(Map<String, dynamic> map) {
+    return NhanVien(
+      maNhanVien: map['ma_nhan_vien'] as String,
+      tenNhanVien: map['ten_nhan_vien'] as String,
+      chucVu: map['chuc_vu'] as String?,
+      diaChi: map['dia_chi'] as String?,
+      dienThoai: map['dien_thoai'] as String?,
+      hinhAnh: map['hinh_anh'] as String?,
+      ghiChu: map['ghi_chu'] as String?,
+    );
   }
 }

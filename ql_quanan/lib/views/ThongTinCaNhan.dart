@@ -119,17 +119,22 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
         updateSuccess = true;
       }
 
+      // views/ThongTinCaNhan.dart
+      // ...
       if (updateSuccess) {
         // Cập nhật lại currentUser trong AuthController
         Provider.of<AuthController>(context, listen: false).updateCurrentUser(
           User(
             maNguoiDung: _currentUser!.maNguoiDung,
             tenDangNhap: _usernameController.text,
+            matKhau: _currentUser!.matKhau, // <--- THÊM DÒNG NÀY
             email: _emailController.text,
             maVaiTro: _currentUser!.maVaiTro,
             maLienQuan: _currentRoleSpecificId,
           ),
         );
+        // ...
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
