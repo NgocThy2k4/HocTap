@@ -28,7 +28,7 @@ class QLQuanAnDatabaseHelper {
       'ql_quan_an_final.db',
     ); // Đổi tên DB để đảm bảo tạo mới
     // Tăng version để cơ sở dữ liệu được tạo lại HOẶC xóa ứng dụng thủ công
-    return await openDatabase(path, version: 102, onCreate: _createDb);
+    return await openDatabase(path, version: 8, onCreate: _createDb);
   }
 
   Future<void> _createDb(Database db, int version) async {

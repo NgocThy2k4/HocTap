@@ -55,7 +55,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundImage: AssetImage(
-                          'assets/HinhAnh/KhachHang/${kh.hinhAnh ?? 'default_customer.png'}',
+                          'assets/HinhAnh/KhachHang/${kh.hinhAnh ?? 'hinh1.jpg'}',
                         ),
                         onBackgroundImageError: (exception, stackTrace) {
                           print(

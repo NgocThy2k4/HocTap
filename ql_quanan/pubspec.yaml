@@ -55,6 +55,9 @@ flutter:
     - assets/HinhAnh/NenDangNhap.jpg
     - assets/HinhAnh/NenDangKy.jpg
     - assets/HinhAnh/LienHe.jpg
+
+    - assets/HinhAnh/KhachHang/default_user.jpg
+    - assets/HinhAnh/KhachHang/default_kh.jpg
     - assets/HinhAnh/KhachHang/hinh1.jpg
     - assets/HinhAnh/KhachHang/hinh2.jpg
     - assets/HinhAnh/KhachHang/hinh3.jpg
@@ -77,6 +80,31 @@ flutter:
     - assets/HinhAnh/KhachHang/hinh20.jpg
     - assets/HinhAnh/KhachHang/hinh21.jpg
     - assets/HinhAnh/KhachHang/hinh22.jpg
+
+    - assets/HinhAnh/NhanVien/default_nv.jpg
+    - assets/HinhAnh/NhanVien/default_admin.jpg
+    - assets/HinhAnh/NhanVien/hinh1.jpg
+    - assets/HinhAnh/NhanVien/hinh2.jpg
+    - assets/HinhAnh/NhanVien/hinh3.jpg
+    - assets/HinhAnh/NhanVien/hinh4.jpg
+    - assets/HinhAnh/NhanVien/hinh5.jpg
+    - assets/HinhAnh/NhanVien/hinh6.jpg
+    - assets/HinhAnh/NhanVien/hinh7.jpg
+    - assets/HinhAnh/NhanVien/hinh8.jpg
+    - assets/HinhAnh/NhanVien/hinh9.jpg
+    - assets/HinhAnh/NhanVien/hinh10.jpg
+    - assets/HinhAnh/NhanVien/hinh11.jpg
+    - assets/HinhAnh/NhanVien/hinh12.jpg
+    - assets/HinhAnh/NhanVien/hinh13.jpg
+    - assets/HinhAnh/NhanVien/hinh14.jpg
+    - assets/HinhAnh/NhanVien/hinh15.jpg
+    - assets/HinhAnh/NhanVien/hinh16.jpg
+    - assets/HinhAnh/NhanVien/hinh17.jpg
+    - assets/HinhAnh/NhanVien/hinh18.jpg
+    - assets/HinhAnh/NhanVien/hinh19.jpg
+    - assets/HinhAnh/NhanVien/hinh20.jpg
+    - assets/HinhAnh/NhanVien/hinh21.jpg
+    - assets/HinhAnh/NhanVien/hinh22.jpg
 
     - assets/HinhAnh/MonAn/hinh1.jpg
     - assets/HinhAnh/MonAn/hinh2.jpg

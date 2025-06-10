@@ -1,13 +1,13 @@
 // controllers/AuthController.dart
 
 import 'package:flutter/material.dart';
-// import 'package:crypto/crypto.dart'; // Bỏ import này nếu không dùng SHA256 nữa
-import 'dart:convert'; // Vẫn cần cho một số encoding khác nếu có, nhưng không dùng cho hash mật khẩu
+import 'package:sqflite/sqflite.dart'; // Thêm dòng này để xử lý DatabaseException
 import '../models/User.dart';
 import '../models/KhachHang.dart';
 import '../models/NhanVien.dart';
 import '../database/DatabaseHelper.dart';
-import 'package:sqflite/sqflite.dart'; // Thêm dòng này để xử lý DatabaseException
+// import 'package:crypto/crypto.dart'; // Bỏ import này nếu không dùng SHA256 nữa
+import 'dart:convert'; // Vẫn cần cho một số encoding khác nếu có, nhưng không dùng cho hash mật khẩu
 
 enum AuthStatus { initial, loading, loggedIn, loggedOut, registered, error }
 
@@ -25,10 +25,13 @@ class AuthController extends ChangeNotifier {
       _currentUser != null && _status == AuthStatus.loggedIn;
 
   AuthController() {
-    _loadCurrentUser();
+    _loadCurrentUser(); // Vẫn giữ hàm này để khởi tạo trạng thái
   }
 
   Future<void> _loadCurrentUser() async {
+    // Logic để tải người dùng hiện tại từ bộ nhớ (nếu có, VD: SharedPreferences)
+    // Hiện tại, bạn chỉ đặt lại trạng thái về loggedOut.
+    // Nếu bạn có logic lưu trạng thái đăng nhập, hãy thêm vào đây.
     _status = AuthStatus.loggedOut;
     notifyListeners();
   }
@@ -40,7 +43,7 @@ class AuthController extends ChangeNotifier {
   //   return digest.toString();
   // }
 
-  // Phương thức đăng nhập - CẬP NHẬT PHẦN NÀY
+  // Phương thức đăng nhập - CẬP NHẬT PHẦN NÀY ĐỂ LẤY HÌNH ẢNH
   Future<void> login(String email, String password) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
@@ -58,19 +61,72 @@ class AuthController extends ChangeNotifier {
         print(
           'Tìm thấy user trong DB: ${user.email}, Ma Nguoi Dung: ${user.maNguoiDung}, Mat Khau DB: ${user.matKhau}',
         );
-        // BỎ DÒNG HASH NÀY
-        // final hashedPassword = _hashPassword(password); // Hash mật khẩu nhập vào để so sánh
 
-        // SO SÁNH TRỰC TIẾP VỚI MẬT KHẨU PLAIN TEXT TỪ DB
+        // So sánh trực tiếp mật khẩu plain text
         if (user.matKhau == password) {
-          // So sánh trực tiếp 'password' với 'user.matKhau'
           _currentUser = user;
+
+          // Bắt đầu logic lấy hình ảnh từ bảng liên quan
+          String? hinhAnhPath; // Khởi tạo là null
+
+          if (_currentUser!.maLienQuan != null) {
+            final db = await _dbHelper.database;
+            if (_currentUser!.maVaiTro == 'QL' ||
+                _currentUser!.maVaiTro == 'NV') {
+              // Là quản lý hoặc nhân viên, lấy ảnh từ bảng nhan_vien
+              List<Map<String, dynamic>> nvResults = await db.query(
+                'nhan_vien',
+                columns: ['hinh_anh'],
+                where: 'ma_nhan_vien = ?',
+                whereArgs: [_currentUser!.maLienQuan!],
+              );
+              if (nvResults.isNotEmpty && nvResults.first['hinh_anh'] != null) {
+                // Giả định 'hinh_anh' trong DB chỉ lưu tên file (ví dụ: 'avatar_admin.jpg')
+                // Nếu DB lưu đường dẫn đầy đủ ('assets/HinhAnh/NhanVien/avatar_admin.jpg'), thì bỏ tiền tố
+                hinhAnhPath = 'assets/HinhAnh/NhanVien/${nvResults.first['hinh_anh']}';
+              }
+            } else if (_currentUser!.maVaiTro == 'KH') {
+              // Là khách hàng, lấy ảnh từ bảng khach_hang
+              List<Map<String, dynamic>> khResults = await db.query(
+                'khach_hang',
+                columns: ['hinh_anh'],
+                where: 'ma_khach_hang = ?',
+                whereArgs: [_currentUser!.maLienQuan!],
+              );
+              if (khResults.isNotEmpty && khResults.first['hinh_anh'] != null) {
+                // Giả định 'hinh_anh' trong DB chỉ lưu tên file (ví dụ: 'avatar_khach.jpg')
+                // Nếu DB lưu đường dẫn đầy đủ ('assets/HinhAnh/KhachHang/avatar_khach.jpg'), thì bỏ tiền tố
+                hinhAnhPath = 'assets/HinhAnh/KhachHang/${khResults.first['hinh_anh']}';
+              }
+            }
+          }
+
+          // --- BỔ SUNG LOGIC GÁN ẢNH MẶC ĐỊNH ---
+          // Nếu hinhAnhPath vẫn là null (không tìm thấy ảnh riêng hoặc maLienQuan null),
+          // gán ảnh mặc định dựa trên vai trò hoặc ảnh mặc định chung
+          if (hinhAnhPath == null) {
+            if (_currentUser!.maVaiTro == 'QL') {
+              hinhAnhPath = 'assets/HinhAnh/NhanVien/default_admin.jpg';
+            } else if (_currentUser!.maVaiTro == 'NV') {
+              hinhAnhPath = 'assets/HinhAnh/NhanVien/default_nv.jpg';
+            } else if (_currentUser!.maVaiTro == 'KH') {
+              hinhAnhPath = 'assets/HinhAnh/KhachHang/default_kh.jpg';
+            } else {
+              // Trường hợp không xác định vai trò hoặc không có mã liên quan
+              hinhAnhPath = 'assets/HinhAnh/KhachHang/default_user.jpg';
+            }
+          }
+          // ------------------------------------
+
+          // Gán đường dẫn hình ảnh (có thể là riêng hoặc mặc định) vào đối tượng User hiện tại
+          _currentUser!.hinhAnh = hinhAnhPath;
+
           _status = AuthStatus.loggedIn;
           print('Đăng nhập thành công: ${user.email}');
+          print('Đường dẫn hình ảnh: ${_currentUser!.hinhAnh ?? "Không có"}');
         } else {
           _errorMessage = 'Email hoặc mật khẩu không đúng.';
           _status = AuthStatus.error;
-          // Cập nhật log để phản ánh việc không hash
           print(
             'Lỗi: Mật khẩu không khớp. Mật khẩu DB: ${user.matKhau}, Mật khẩu nhập: $password',
           );
@@ -78,7 +134,7 @@ class AuthController extends ChangeNotifier {
       } else {
         _errorMessage = 'Email hoặc mật khẩu không đúng.';
         _status = AuthStatus.error;
-        print('Lỗi: Không tìm thấy email: ${email} trong DB.');
+        print('Lỗi: Không tìm thấy email: $email trong DB.');
       }
     } on DatabaseException catch (e) {
       _errorMessage = 'Lỗi cơ sở dữ liệu khi đăng nhập: ${e.toString()}';
@@ -86,7 +142,7 @@ class AuthController extends ChangeNotifier {
       print('LỖI DB KHI ĐĂNG NHẬP: ${e.toString()}');
     } catch (e) {
       _errorMessage =
-          'Đã xảy ra lỗi không xác định khi đăng nhập: ${e.toString()}';
+      'Đã xảy ra lỗi không xác định khi đăng nhập: ${e.toString()}';
       _status = AuthStatus.error;
       print('LỖI ĐĂNG NHẬP TỔNG QUÁT: ${e.toString()}');
     } finally {
@@ -95,7 +151,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // Phương thức đăng ký - Giữ nguyên như trước (đã bao gồm log)
+  // Phương thức đăng ký - Giữ nguyên như trước, chỉ đảm bảo hinh_anh mặc định đúng
   Future<bool> register({
     required String tenDangNhap,
     required String email,
@@ -134,12 +190,15 @@ class AuthController extends ChangeNotifier {
 
       String maLienQuan = '';
       String prefix = '';
+      String defaultImagePath = ''; // Đường dẫn ảnh mặc định
 
       if (maVaiTro == 'KH') {
         prefix = 'KH';
         int nextIdNum = await _dbHelper.getNextMaNguoiDung(prefix);
         maLienQuan =
             '$prefix${nextIdNum.toString().padLeft(2, '0')}'; // VD: KH01, KH02
+        defaultImagePath =
+            'hinh1.jpg'; // Ảnh mặc định cho khách hàng (ví dụ: hinh1.jpg)
 
         print('Đăng ký khách hàng. maLienQuan: $maLienQuan');
 
@@ -149,31 +208,34 @@ class AuthController extends ChangeNotifier {
           tenKhachHang: tenDangNhap,
           diaChi: '',
           dienThoai: '',
-          hinhAnh:
-              'default_customer.png', // Đảm bảo ảnh này tồn tại trong assets/HinhAnh
+          hinhAnh: defaultImagePath, // Gán ảnh mặc định
           ghiChu: '',
         );
         print('Đang chèn KhachHang: ${newKhachHang.toMap()}');
         await _dbHelper.insertKhachHang(newKhachHang.toMap());
         print('Chèn KhachHang thành công.');
-      } else if (maVaiTro == 'NV') {
+      } else if (maVaiTro == 'NV' || maVaiTro == 'QL') {
+        // Quản lý cũng là một loại nhân viên
         prefix = 'NV';
         int nextIdNum = await _dbHelper.getNextMaNguoiDung(prefix);
         maLienQuan =
             '$prefix${nextIdNum.toString().padLeft(2, '0')}'; // VD: NV01, NV02
+        defaultImagePath =
+            'nv_default.jpg'; // Ảnh mặc định cho nhân viên/quản lý (ví dụ: nv_default.jpg)
 
-        print('Đăng ký nhân viên. maLienQuan: $maLienQuan');
+        print('Đăng ký nhân viên/quản lý. maLienQuan: $maLienQuan');
 
         // CHÈN NHANVIEN VÀO DATABASE TRƯỚC
         NhanVien newNhanVien = NhanVien(
           maNhanVien: maLienQuan,
           tenNhanVien: tenDangNhap,
           chucVu:
-              'Nhân viên mới', // Cần thiết lập giá trị mặc định hoặc cho phép nhập
+              maVaiTro == 'QL'
+                  ? 'Quản Lý'
+                  : 'Nhân Viên Mới', // Tùy chỉnh chức vụ
           diaChi: '',
           dienThoai: '',
-          hinhAnh:
-              'default_employee.png', // Đảm bảo ảnh này tồn tại trong assets/HinhAnh
+          hinhAnh: defaultImagePath, // Gán ảnh mặc định
           ghiChu: '',
         );
         print('Đang chèn NhanVien: ${newNhanVien.toMap()}');
@@ -187,10 +249,6 @@ class AuthController extends ChangeNotifier {
         return false;
       }
 
-      // BỎ DÒNG HASH MẬT KHẨU NÀY
-      // final hashedPassword = _hashPassword(matKhau);
-      // print('Mật khẩu đã hash: $hashedPassword');
-
       // Tạo User và chèn vào database, sử dụng mật khẩu PLAIN TEXT
       User newUser = User(
         maNguoiDung:
@@ -200,6 +258,10 @@ class AuthController extends ChangeNotifier {
         email: email,
         maVaiTro: maVaiTro,
         maLienQuan: maLienQuan,
+        hinhAnh:
+            maVaiTro == 'KH'
+                ? 'assets/HinhAnh/KhachHang/$defaultImagePath'
+                : 'assets/HinhAnh/NhanVien/$defaultImagePath', // Gán đường dẫn đầy đủ
       );
       print('Đang chèn User: ${newUser.toMap()}');
       await _dbHelper.insertUser(newUser.toMap());
@@ -275,8 +337,6 @@ class AuthController extends ChangeNotifier {
     try {
       final userMap = await _dbHelper.getUserByEmail(email);
       if (userMap != null) {
-        // BỎ DÒNG HASH MẬT KHẨU NÀY
-        // final password = _hashPassword(newPassword);
         Map<String, dynamic> updatedUserMap = Map.from(userMap);
         updatedUserMap['mat_khau'] = newPassword; // LƯU MẬT KHẨU PLAIN TEXT
 

@@ -49,6 +49,9 @@ class _TrangChuState extends State<TrangChu> {
     // Kiểm tra nếu người dùng là quản lý
     final bool isAdmin = user != null && user.maVaiTro == 'QL';
 
+    // bổ sung để hiển thị ảnh theo người đang nhập
+    final String avatarImagePath = user?.hinhAnh ?? 'assets/HinhAnh/KhachHang/default_user.jpg';
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -127,15 +130,11 @@ class _TrangChuState extends State<TrangChu> {
                     CircleAvatar(
                       radius: 40,
                       backgroundColor: Colors.white,
-                      // TODO: Thay bằng ảnh người dùng thực tế từ DB
-                      // Dựa vào maVaiTro để chọn ảnh mặc định hoặc load ảnh của user
-                      backgroundImage: AssetImage(
-                        user?.maVaiTro == 'QL'
-                            ? 'assets/HinhAnh/KhachHang/hinh1.jpg'
-                            : user?.maVaiTro == 'NV'
-                            ? 'assets/HinhAnh/KhachHang/hinh1.jpg'
-                            : 'assets/HinhAnh/KhachHang/hinh1.jpg', // Default cho khách hàng
-                      ),
+                      backgroundImage: AssetImage(avatarImagePath), // SỬ DỤNG TRỰC TIẾP avatarImagePath
+                      onBackgroundImageError: (exception, stackTrace) {
+                        debugPrint('Lỗi tải ảnh đại diện từ đường dẫn: $avatarImagePath, Lỗi: $exception');
+                        // Có thể đặt một ảnh placeholder khác nếu ảnh lỗi
+                      },
                     ),
                     Text(
                       user?.tenDangNhap ?? 'Khách',
