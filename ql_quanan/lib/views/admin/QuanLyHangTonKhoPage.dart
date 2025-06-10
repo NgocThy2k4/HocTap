@@ -1,60 +1,60 @@
-// views/admin/QuanLyKhachHangPage.dart
+// views/admin/QuanLyHangTonKhoPage.dart
 import 'package:flutter/material.dart';
-import 'package:sqlite3/sqlite3.dart';
 import '../../database/DatabaseHelper.dart';
-import '../../models/KhachHang.dart';
 
-class QuanLyKhachHangPage extends StatefulWidget {
+class QuanLyHangTonKhoPage extends StatefulWidget {
   @override
-  _QuanLyKhachHangPageState createState() => _QuanLyKhachHangPageState();
+  _QuanLyHangTonKhoPageState createState() => _QuanLyHangTonKhoPageState();
 }
 
-class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
+class _QuanLyHangTonKhoPageState extends State<QuanLyHangTonKhoPage> {
   final QLQuanAnDatabaseHelper _dbHelper = QLQuanAnDatabaseHelper.instance;
   final TextEditingController _searchController = TextEditingController();
-  List<KhachHang> _khachHangList = [];
-  List<KhachHang> _filteredKhachHangList = [];
+  List<Map<String, dynamic>> _inventoryList = [];
+  List<Map<String, dynamic>> _filteredInventoryList = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadKhachHang();
-    _searchController.addListener(_filterKhachHang);
+    _loadInventory();
+    _searchController.addListener(_filterInventory);
   }
 
-  Future<void> _loadKhachHang() async {
+  Future<void> _loadInventory() async {
     setState(() => _isLoading = true);
-    final db = await _dbHelper.database;
-    final result = await db.query('khach_hang');
-    _khachHangList = result.map((map) => KhachHang.fromMap(map)).toList();
-    _filteredKhachHangList = _khachHangList;
+    _inventoryList = await _dbHelper.getAllInventory();
+    _filteredInventoryList = _inventoryList;
     setState(() => _isLoading = false);
   }
 
-  void _filterKhachHang() {
+  void _filterInventory() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredKhachHangList =
-          _khachHangList.where((kh) {
-            final ten = kh.tenKhachHang?.toLowerCase() ?? '';
-            return ten.contains(query);
+      _filteredInventoryList =
+          _inventoryList.where((item) {
+            final tenNguyenLieu =
+                item['ten_nguyen_lieu'].toString().toLowerCase();
+            return tenNguyenLieu.contains(query);
           }).toList();
     });
   }
 
-  Future<void> _showAddEditDialog({KhachHang? khachHang}) async {
+  Future<void> _showAddEditDialog({Map<String, dynamic>? item}) async {
     final TextEditingController tenController = TextEditingController(
-      text: khachHang?.tenKhachHang,
+      text: item?['ten_nguyen_lieu'],
     );
-    final TextEditingController diaChiController = TextEditingController(
-      text: khachHang?.diaChi,
+    final TextEditingController soLuongController = TextEditingController(
+      text: item?['so_luong_ton'].toString(),
     );
-    final TextEditingController dienThoaiController = TextEditingController(
-      text: khachHang?.dienThoai,
+    final TextEditingController donViController = TextEditingController(
+      text: item?['don_vi'],
+    );
+    final TextEditingController nguongController = TextEditingController(
+      text: item?['nguong_canh_bao'].toString(),
     );
     final TextEditingController ghiChuController = TextEditingController(
-      text: khachHang?.ghiChu,
+      text: item?['ghi_chu'],
     );
 
     await showDialog(
@@ -62,7 +62,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
       builder:
           (context) => AlertDialog(
             title: Text(
-              khachHang == null ? 'Thêm Khách Hàng' : 'Sửa Khách Hàng',
+              item == null ? 'Thêm Nguyên Liệu' : 'Sửa Nguyên Liệu',
               style: TextStyle(color: Color(0xFFE91E63)),
             ),
             content: SingleChildScrollView(
@@ -72,7 +72,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                   TextField(
                     controller: tenController,
                     decoration: InputDecoration(
-                      labelText: 'Tên khách hàng',
+                      labelText: 'Tên nguyên liệu',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -82,9 +82,10 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                   ),
                   SizedBox(height: 10),
                   TextField(
-                    controller: diaChiController,
+                    controller: soLuongController,
+                    keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Địa chỉ',
+                      labelText: 'Số lượng tồn',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -94,10 +95,22 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                   ),
                   SizedBox(height: 10),
                   TextField(
-                    controller: dienThoaiController,
-                    keyboardType: TextInputType.phone,
+                    controller: donViController,
                     decoration: InputDecoration(
-                      labelText: 'Số điện thoại',
+                      labelText: 'Đơn vị (kg, lít, ...)',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: nguongController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Ngưỡng cảnh báo',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -127,41 +140,45 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
               ),
               TextButton(
                 onPressed: () async {
-                  if (tenController.text.isEmpty) {
+                  if (tenController.text.isEmpty ||
+                      soLuongController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Vui lòng nhập tên khách hàng.'),
+                        content: Text('Vui lòng nhập đầy đủ thông tin.'),
                         backgroundColor: Colors.red,
                       ),
                     );
                     return;
                   }
 
-                  final newKhachHang = KhachHang(
-                    maKhachHang:
-                        khachHang?.maKhachHang ??
-                        'KH${DateTime.now().millisecondsSinceEpoch}',
-                    tenKhachHang: tenController.text,
-                    diaChi: diaChiController.text,
-                    dienThoai: dienThoaiController.text,
-                    hinhAnh: khachHang?.hinhAnh ?? 'default_khach_hang.jpg',
-                    ghiChu: ghiChuController.text,
-                  );
+                  final newItem = {
+                    'ma_nguyen_lieu':
+                        item?['ma_nguyen_lieu'] ??
+                        await _dbHelper.generateInventoryId(),
+                    'ten_nguyen_lieu': tenController.text,
+                    'so_luong_ton': int.parse(soLuongController.text),
+                    'don_vi': donViController.text,
+                    'nguong_canh_bao':
+                        nguongController.text.isEmpty
+                            ? null
+                            : int.parse(nguongController.text),
+                    'ghi_chu': ghiChuController.text,
+                  };
 
-                  if (khachHang == null) {
-                    await _dbHelper.insertKhachHang(newKhachHang.toMap());
+                  if (item == null) {
+                    await _dbHelper.insertInventory(newItem);
                   } else {
-                    await _dbHelper.updateKhachHang(newKhachHang.toMap());
+                    await _dbHelper.updateInventory(newItem);
                   }
 
-                  _loadKhachHang();
+                  _loadInventory();
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        khachHang == null
-                            ? 'Thêm khách hàng thành công.'
-                            : 'Cập nhật khách hàng thành công.',
+                        item == null
+                            ? 'Thêm nguyên liệu thành công.'
+                            : 'Cập nhật nguyên liệu thành công.',
                       ),
                       backgroundColor: Colors.green,
                     ),
@@ -171,15 +188,6 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
               ),
             ],
           ),
-    );
-  }
-
-  Future<void> insertKhachHang(Map<String, dynamic> khachHang) async {
-    final db = await database;
-    await db.insert(
-      'khach_hang',
-      khachHang,
-      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
@@ -194,7 +202,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Quản Lý Khách Hàng',
+          'Quản Lý Hàng Tồn Kho',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Color(0xFFFFB2D9),
@@ -208,7 +216,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Tìm kiếm khách hàng...',
+                hintText: 'Tìm kiếm nguyên liệu...',
                 prefixIcon: Icon(Icons.search, color: Color(0xFFE91E63)),
                 filled: true,
                 fillColor: Colors.white,
@@ -226,12 +234,15 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                         color: Color(0xFFE91E63),
                       ),
                     )
-                    : _filteredKhachHangList.isEmpty
-                    ? Center(child: Text('Không có khách hàng nào.'))
+                    : _filteredInventoryList.isEmpty
+                    ? Center(child: Text('Không có nguyên liệu nào.'))
                     : ListView.builder(
-                      itemCount: _filteredKhachHangList.length,
+                      itemCount: _filteredInventoryList.length,
                       itemBuilder: (context, index) {
-                        final kh = _filteredKhachHangList[index];
+                        final item = _filteredInventoryList[index];
+                        final isLowStock =
+                            item['nguong_canh_bao'] != null &&
+                            item['so_luong_ton'] <= item['nguong_canh_bao'];
                         return Card(
                           color: Colors.white,
                           margin: EdgeInsets.symmetric(
@@ -243,17 +254,16 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: AssetImage(
-                                'assets/HinhAnh/KhachHang/${kh.hinhAnh ?? 'default_khach_hang.jpg'}',
-                              ),
-                            ),
                             title: Text(
-                              kh.tenKhachHang ?? 'Chưa có tên',
+                              item['ten_nguyen_lieu'] ?? '',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              '${kh.dienThoai ?? ''}\n${kh.diaChi ?? ''}',
+                              'Số lượng: ${item['so_luong_ton']} ${item['don_vi'] ?? ''}\n'
+                              'Ngưỡng cảnh báo: ${item['nguong_canh_bao'] ?? 'Không đặt'}',
+                              style: TextStyle(
+                                color: isLowStock ? Colors.red : Colors.black87,
+                              ),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -261,7 +271,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                                 IconButton(
                                   icon: Icon(Icons.edit, color: Colors.blue),
                                   onPressed:
-                                      () => _showAddEditDialog(khachHang: kh),
+                                      () => _showAddEditDialog(item: item),
                                 ),
                                 IconButton(
                                   icon: Icon(Icons.delete, color: Colors.red),
@@ -277,7 +287,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                                               ),
                                             ),
                                             content: Text(
-                                              'Bạn có chắc muốn xóa khách hàng này?',
+                                              'Bạn có chắc muốn xóa nguyên liệu này?',
                                             ),
                                             actions: [
                                               TextButton(
@@ -310,15 +320,15 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                                           ),
                                     );
                                     if (confirm == true) {
-                                      await _dbHelper.deleteKhachHang(
-                                        kh.maKhachHang,
+                                      await _dbHelper.deleteInventory(
+                                        item['ma_nguyen_lieu'],
                                       );
-                                      _loadKhachHang();
+                                      _loadInventory();
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
                                         SnackBar(
-                                          content: Text('Đã xóa khách hàng.'),
+                                          content: Text('Đã xóa nguyên liệu.'),
                                           backgroundColor: Colors.green,
                                         ),
                                       );

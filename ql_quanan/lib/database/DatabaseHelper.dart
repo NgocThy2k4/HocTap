@@ -28,7 +28,7 @@ class QLQuanAnDatabaseHelper {
       'ql_quan_an_final.db',
     ); // Đổi tên DB để đảm bảo tạo mới
     // Tăng version để cơ sở dữ liệu được tạo lại HOẶC xóa ứng dụng thủ công
-    return await openDatabase(path, version: 8, onCreate: _createDb);
+    return await openDatabase(path, version: 18, onCreate: _createDb);
   }
 
   Future<void> _createDb(Database db, int version) async {
@@ -137,7 +137,80 @@ class QLQuanAnDatabaseHelper {
         FOREIGN KEY (ma_mon) REFERENCES mon_an (ma_mon)
       )
     ''');
+    // Thêm 1 số bảng để lưu đơn hàng, chi tiết đơn hàng, v.v. nếu cần
+    // Bảng orders để lưu đơn hàng
+    await db.execute('''
+      CREATE TABLE orders (
+        ma_don_hang TEXT PRIMARY KEY,
+        ma_khach_hang TEXT,
+        tong_tien REAL NOT NULL,
+        dia_chi_giao_hang TEXT,
+        phuong_thuc_thanh_toan TEXT,
+        trang_thai TEXT NOT NULL,
+        ngay_dat TEXT NOT NULL,
+        FOREIGN KEY (ma_khach_hang) REFERENCES khach_hang(ma_khach_hang)
+      )
+    ''');
 
+    // Bảng order_details để lưu chi tiết đơn hàng
+    await db.execute('''
+      CREATE TABLE order_details (
+        ma_don_hang TEXT,
+        ma_mon TEXT,
+        so_luong INTEGER NOT NULL,
+        don_gia REAL NOT NULL,
+        PRIMARY KEY (ma_don_hang, ma_mon),
+        FOREIGN KEY (ma_don_hang) REFERENCES orders(ma_don_hang),
+        FOREIGN KEY (ma_mon) REFERENCES mon_an(ma_mon)
+      )
+    ''');
+
+    // Bảng reviews để lưu đánh giá
+    await db.execute('''
+      CREATE TABLE reviews (
+        ma_danh_gia TEXT PRIMARY KEY,
+        ma_khach_hang TEXT,
+        ma_mon TEXT,
+        danh_gia INTEGER NOT NULL,
+        nhan_xet TEXT,
+        ngay_danh_gia TEXT NOT NULL,
+        FOREIGN KEY (ma_khach_hang) REFERENCES khach_hang(ma_khach_hang),
+        FOREIGN KEY (ma_mon) REFERENCES mon_an(ma_mon)
+      )
+    ''');
+
+    // Bảng promotions để lưu thông báo khuyến mãi
+    await db.execute('''
+      CREATE TABLE promotions (
+        ma_khuyen_mai TEXT PRIMARY KEY,
+        tieu_de TEXT NOT NULL,
+        noi_dung TEXT,
+        ngay_bat_dau TEXT NOT NULL,
+        ngay_ket_thuc TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+  CREATE TABLE cart (
+    ma_nguoi_dung TEXT,
+    ma_mon TEXT,
+    quantity INTEGER NOT NULL,
+    PRIMARY KEY (ma_nguoi_dung, ma_mon),
+    FOREIGN KEY (ma_nguoi_dung) REFERENCES users(ma_nguoi_dung),
+    FOREIGN KEY (ma_mon) REFERENCES mon_an(ma_mon)
+  )
+''');
+
+    await db.execute('''
+      CREATE TABLE inventory (
+        ma_nguyen_lieu TEXT PRIMARY KEY,
+        ten_nguyen_lieu TEXT NOT NULL,
+        so_luong_ton INTEGER NOT NULL,
+        don_vi TEXT,
+        nguong_canh_bao INTEGER,
+        ghi_chu TEXT
+      )
+    ''');
     // Chèn dữ liệu ban đầu sau khi tạo bảng
     await insertInitialData(db);
   }
@@ -145,36 +218,186 @@ class QLQuanAnDatabaseHelper {
   // --- CÁC PHƯƠNG THỨC CRUD CHO nguoi_dung ---
 
   // Hàm insertUser: Chèn hoặc cập nhật người dùng (đã sửa để không loại bỏ mật khẩu)
-  Future<int> insertUser(Map<String, dynamic> userMap) async {
+  Future<void> insertUser(Map<String, dynamic> user) async {
     final db = await database;
-    print('DBG: insertUser received map: $userMap'); // Log để kiểm tra input
-
-    // Kiểm tra xem người dùng đã tồn tại bằng ma_nguoi_dung chưa
-    List<Map<String, dynamic>> existingUser = await db.query(
+    await db.insert(
       'nguoi_dung',
-      where: 'ma_nguoi_dung = ?',
-      whereArgs: [userMap['ma_nguoi_dung']],
+      user,
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
 
-    if (existingUser.isNotEmpty) {
-      // Nếu tồn tại, cập nhật bản ghi hiện có
-      // Cập nhật toàn bộ userMap, bao gồm 'mat_khau'.
-      print(
-        'DBG: Updating existing user with ma_nguoi_dung: ${userMap['ma_nguoi_dung']}',
-      );
-      return await db.update(
-        'nguoi_dung',
-        userMap,
-        where: 'ma_nguoi_dung = ?',
-        whereArgs: [userMap['ma_nguoi_dung']],
-      );
-    } else {
-      // Nếu chưa tồn tại, chèn bản ghi mới
-      print(
-        'DBG: Inserting new user with ma_nguoi_dung: ${userMap['ma_nguoi_dung']}',
-      );
-      return await db.insert('nguoi_dung', userMap);
-    }
+  // KhachHang methods
+  Future<Map<String, dynamic>?> getKhachHangByMa(String maKhachHang) async {
+    final db = await database;
+    final result = await db.query(
+      'khach_hang',
+      where: 'ma_khach_hang = ?',
+      whereArgs: [maKhachHang],
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<void> updateKhachHang(Map<String, dynamic> khachHang) async {
+    final db = await database;
+    await db.update(
+      'khach_hang',
+      khachHang,
+      where: 'ma_khach_hang = ?',
+      whereArgs: [khachHang['ma_khach_hang']],
+    );
+  }
+
+  // NhanVien methods
+  Future<List<NhanVien>> getAllNhanVien() async {
+    final db = await database;
+    final result = await db.query('nhan_vien');
+    return result.map((map) => NhanVien.fromMap(map)).toList();
+  }
+
+  Future<Map<String, dynamic>?> getNhanVienByMa(String maNhanVien) async {
+    final db = await database;
+    final result = await db.query(
+      'nhan_vien',
+      where: 'ma_nhan_vien = ?',
+      whereArgs: [maNhanVien],
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<void> insertNhanVien(Map<String, dynamic> nhanVien) async {
+    final db = await database;
+    await db.insert(
+      'nhan_vien',
+      nhanVien,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateNhanVien(Map<String, dynamic> nhanVien) async {
+    final db = await database;
+    await db.update(
+      'nhan_vien',
+      nhanVien,
+      where: 'ma_nhan_vien = ?',
+      whereArgs: [nhanVien['ma_nhan_vien']],
+    );
+  }
+
+  Future<void> deleteNhanVien(String maNhanVien) async {
+    final db = await database;
+    await db.delete(
+      'nhan_vien',
+      where: 'ma_nhan_vien = ?',
+      whereArgs: [maNhanVien],
+    );
+  }
+
+  // MonAn methods
+  Future<List<MonAn>> getAllMonAn() async {
+    final db = await database;
+    final result = await db.query('mon_an');
+    return result.map((map) => MonAn.fromMap(map)).toList();
+  }
+
+  // Promotion methods
+  Future<List<Map<String, dynamic>>> getAllPromotions() async {
+    final db = await database;
+    return await db.query('promotions');
+  }
+
+  Future<void> insertPromotion(Map<String, dynamic> promotion) async {
+    final db = await database;
+    await db.insert(
+      'promotions',
+      promotion,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updatePromotion(Map<String, dynamic> promotion) async {
+    final db = await database;
+    await db.update(
+      'promotions',
+      promotion,
+      where: 'ma_khuyen_mai = ?',
+      whereArgs: [promotion['ma_khuyen_mai']],
+    );
+  }
+
+  Future<void> deletePromotion(String maKhuyenMai) async {
+    final db = await database;
+    await db.delete(
+      'promotions',
+      where: 'ma_khuyen_mai = ?',
+      whereArgs: [maKhuyenMai],
+    );
+  }
+
+  Future<String> generatePromotionId() async {
+    final db = await database;
+    final result = await db.query(
+      'promotions',
+      orderBy: 'ma_khuyen_mai DESC',
+      limit: 1,
+    );
+    if (result.isEmpty) return 'KM001';
+    final lastId = result.first['ma_khuyen_mai'] as String;
+    final number = int.parse(lastId.replaceFirst('KM', '')) + 1;
+    return 'KM${number.toString().padLeft(3, '0')}';
+  }
+
+  // Review methods
+  Future<List<Map<String, dynamic>>> getAllReviews() async {
+    final db = await database;
+    return await db.query('reviews');
+  }
+
+  // Inventory methods
+  Future<List<Map<String, dynamic>>> getAllInventory() async {
+    final db = await database;
+    return await db.query('inventory');
+  }
+
+  Future<void> insertInventory(Map<String, dynamic> item) async {
+    final db = await database;
+    await db.insert(
+      'inventory',
+      item,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateInventory(Map<String, dynamic> item) async {
+    final db = await database;
+    await db.update(
+      'inventory',
+      item,
+      where: 'ma_nguyen_lieu = ?',
+      whereArgs: [item['ma_nguyen_lieu']],
+    );
+  }
+
+  Future<void> deleteInventory(String maNguyenLieu) async {
+    final db = await database;
+    await db.delete(
+      'inventory',
+      where: 'ma_nguyen_lieu = ?',
+      whereArgs: [maNguyenLieu],
+    );
+  }
+
+  Future<String> generateInventoryId() async {
+    final db = await database;
+    final result = await db.query(
+      'inventory',
+      orderBy: 'ma_nguyen_lieu DESC',
+      limit: 1,
+    );
+    if (result.isEmpty) return 'NL001';
+    final lastId = result.first['ma_nguyen_lieu'] as String;
+    final number = int.parse(lastId.replaceFirst('NL', '')) + 1;
+    return 'NL${number.toString().padLeft(3, '0')}';
   }
 
   // Hàm updateUser: Dùng để cập nhật người dùng.
@@ -221,7 +444,7 @@ class QLQuanAnDatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getAllUsers() async {
+  Future<List<Map<String, dynamic>>> getAllnguoi_dung() async {
     final db = await database;
     return await db.query('nguoi_dung');
   }
@@ -256,15 +479,6 @@ class QLQuanAnDatabaseHelper {
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<void> insertNhanVien(Map<String, dynamic> nhanVien) async {
-    final db = await database;
-    await db.insert(
-      'nhan_vien',
-      nhanVien,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
   Future<void> insertKhachHang(Map<String, dynamic> khachHang) async {
     final db = await database;
     await db.insert(
@@ -272,16 +486,6 @@ class QLQuanAnDatabaseHelper {
       khachHang,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-  }
-
-  Future<Map<String, dynamic>?> getNhanVienByMa(String maNhanVien) async {
-    final db = await database;
-    List<Map<String, dynamic>> results = await db.query(
-      'nhan_vien',
-      where: 'ma_nhan_vien = ?',
-      whereArgs: [maNhanVien],
-    );
-    return results.isNotEmpty ? results.first : null;
   }
 
   Future<int> getNextMaNguoiDung(String prefix) async {
@@ -306,16 +510,6 @@ class QLQuanAnDatabaseHelper {
     return 1; // Bắt đầu từ 1 nếu không có
   }
 
-  Future<void> updateKhachHang(Map<String, dynamic> khachHang) async {
-    final db = await database;
-    await db.update(
-      'khach_hang',
-      khachHang,
-      where: 'ma_khach_hang = ?',
-      whereArgs: [khachHang['ma_khach_hang']],
-    );
-  }
-
   Future<int> deleteKhachHang(String maKhachHang) async {
     final db = await database;
     print('DBG: Deleting KhachHang: $maKhachHang');
@@ -331,53 +525,6 @@ class QLQuanAnDatabaseHelper {
     final List<Map<String, dynamic>> maps = await db.query('khach_hang');
     return List.generate(maps.length, (i) {
       return KhachHang.fromMap(maps[i]);
-    });
-  }
-
-  Future<Map<String, dynamic>?> getKhachHangByMa(String maKhachHang) async {
-    final db = await database;
-    List<Map<String, dynamic>> results = await db.query(
-      'khach_hang',
-      where: 'ma_khach_hang = ?',
-      whereArgs: [maKhachHang],
-    );
-    return results.isNotEmpty ? results.first : null;
-  }
-
-  Future<void> updateNhanVien(Map<String, dynamic> nhanVien) async {
-    final db = await database;
-    await db.update(
-      'nhan_vien',
-      nhanVien,
-      where: 'ma_nhan_vien = ?',
-      whereArgs: [nhanVien['ma_nhan_vien']],
-    );
-  }
-
-  Future<int> deleteNhanVien(String maNhanVien) async {
-    final db = await database;
-    print('DBG: Deleting NhanVien: $maNhanVien');
-    return await db.delete(
-      'nhan_vien',
-      where: 'ma_nhan_vien = ?',
-      whereArgs: [maNhanVien],
-    );
-  }
-
-  Future<List<NhanVien>> getAllNhanVien() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('nhan_vien');
-    return List.generate(maps.length, (i) {
-      return NhanVien.fromMap(maps[i]);
-    });
-  }
-
-  Future<List<MonAn>> getAllMonAn() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('mon_an');
-
-    return List.generate(maps.length, (i) {
-      return MonAn.fromMap(maps[i]);
     });
   }
 
@@ -399,5 +546,115 @@ class QLQuanAnDatabaseHelper {
     final db = await database;
     print('DBG: Deleting MonAn: $maMon');
     return await db.delete('mon_an', where: 'ma_mon = ?', whereArgs: [maMon]);
+  }
+
+  // Dành cho đơn hàng
+  // Hàm tạo mã đơn hàng duy nhất
+  Future<String> generateOrderId() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM orders');
+    final count = result.first['count'] as int;
+    return 'DH${(count + 1).toString().padLeft(4, '0')}'; // Ví dụ: DH0001
+  }
+
+  // Hàm tạo mã đánh giá duy nhất
+  Future<String> generateReviewId() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM reviews');
+    final count = result.first['count'] as int;
+    return 'DG${(count + 1).toString().padLeft(4, '0')}'; // Ví dụ: DG0001
+  }
+
+  // Thêm đơn hàng
+  Future<void> insertOrder(Map<String, dynamic> order) async {
+    final db = await database;
+    await db.insert('orders', order);
+  }
+
+  // Thêm chi tiết đơn hàng
+  Future<void> insertOrderDetail(Map<String, dynamic> detail) async {
+    final db = await database;
+    await db.insert('order_details', detail);
+  }
+
+  // Lấy danh sách đơn hàng theo khách hàng
+  Future<List<Map<String, dynamic>>> getOrdersByCustomer(
+    String maKhachHang,
+  ) async {
+    final db = await database;
+    return await db.query(
+      'orders',
+      where: 'ma_khach_hang = ?',
+      whereArgs: [maKhachHang],
+    );
+  }
+
+  // Lấy chi tiết đơn hàng
+  Future<List<Map<String, dynamic>>> getOrderDetails(String maDonHang) async {
+    final db = await database;
+    return await db.query(
+      'order_details',
+      where: 'ma_don_hang = ?',
+      whereArgs: [maDonHang],
+    );
+  }
+
+  // Lấy tất cả đơn hàng (cho nhân viên/quản lý)
+  Future<List<Map<String, dynamic>>> getAllOrders() async {
+    final db = await database;
+    return await db.query('orders');
+  }
+
+  // Cập nhật trạng thái đơn hàng
+  Future<void> updateOrderStatus(String maDonHang, String trangThai) async {
+    final db = await database;
+    await db.update(
+      'orders',
+      {'trang_thai': trangThai},
+      where: 'ma_don_hang = ?',
+      whereArgs: [maDonHang],
+    );
+  }
+
+  // Thêm đánh giá
+  Future<void> insertReview(Map<String, dynamic> review) async {
+    final db = await database;
+    await db.insert('reviews', review);
+  }
+
+  // Lấy đánh giá theo món ăn
+  Future<List<Map<String, dynamic>>> getReviewsByMonAn(String maMon) async {
+    final db = await database;
+    return await db.query('reviews', where: 'ma_mon = ?', whereArgs: [maMon]);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE inventory (
+          ma_nguyen_lieu TEXT PRIMARY KEY,
+          ten_nguyen_lieu TEXT NOT NULL,
+          so_luong_ton INTEGER NOT NULL,
+          don_vi TEXT,
+          nguong_canh_bao INTEGER,
+          ghi_chu TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE cart (
+          ma_gio_hang TEXT PRIMARY KEY,
+          ma_khach_hang TEXT,
+          ma_mon_an TEXT,
+          so_luong INTEGER,
+          FOREIGN KEY (ma_khach_hang) REFERENCES khach_hang (ma_khach_hang),
+          FOREIGN KEY (ma_mon_an) REFERENCES mon_an (ma_mon_an)
+        )
+      ''');
+      await db.execute('ALTER TABLE mon_an ADD COLUMN mo_ta TEXT');
+      await db.execute('ALTER TABLE promotions ADD COLUMN gia_tri_giam REAL');
+      await db.execute('ALTER TABLE reviews ADD COLUMN ngay_danh_gia TEXT');
+    }
   }
 }

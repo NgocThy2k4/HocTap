@@ -1,12 +1,13 @@
 // views/ThongTinCaNhan.dart
-
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../controllers/AuthController.dart';
 import '../database/DatabaseHelper.dart';
 import '../models/User.dart';
 import '../models/KhachHang.dart';
 import '../models/NhanVien.dart';
+import 'dart:io';
 
 class ThongTinCaNhan extends StatefulWidget {
   @override
@@ -20,12 +21,14 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _chucVuController =
-      TextEditingController(); // Chỉ cho nhân viên
+  final TextEditingController _chucVuController = TextEditingController();
 
   User? _currentUser;
-  String? _currentRoleSpecificId; // ma_khach_hang hoặc ma_nhan_vien
-  String? _currentProfileImage; // Đường dẫn ảnh hồ sơ
+  String? _currentRoleSpecificId;
+  String? _currentProfileImage; // Lưu tên file ảnh (không bao gồm đường dẫn)
+  File? _selectedImage; // Ảnh mới được chọn từ thư viện
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -40,6 +43,7 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
       _usernameController.text = _currentUser!.tenDangNhap;
       _emailController.text = _currentUser!.email;
       _currentRoleSpecificId = _currentUser!.maLienQuan;
+      _currentProfileImage = _currentUser!.hinhAnh;
 
       final dbHelper = QLQuanAnDatabaseHelper.instance;
 
@@ -72,6 +76,16 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+        _currentProfileImage = pickedFile.path.split('/').last; // Lưu tên file
+      });
+    }
+  }
+
   Future<void> _updateUserProfile() async {
     if (_formKey.currentState!.validate()) {
       if (_currentUser == null || _currentRoleSpecificId == null) return;
@@ -80,14 +94,16 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
       bool updateSuccess = false;
 
       // Cập nhật bảng nguoi_dung
-      await dbHelper.insertUser({
+      final userMap = {
         'ma_nguoi_dung': _currentUser!.maNguoiDung,
         'ten_dang_nhap': _usernameController.text,
-        'mat_khau': _currentUser!.toMap()['mat_khau'], // Giữ nguyên mật khẩu
+        'mat_khau': _currentUser!.matKhau,
         'email': _emailController.text,
         'ma_vai_tro': _currentUser!.maVaiTro,
         'ma_lien_quan': _currentRoleSpecificId,
-      });
+        'hinh_anh': _currentProfileImage, // Cập nhật tên file ảnh
+      };
+      await dbHelper.insertUser(userMap);
 
       if (_currentUser!.maVaiTro == 'KH') {
         final khachHang = KhachHang(
@@ -95,46 +111,49 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
           tenKhachHang: _usernameController.text,
           diaChi: _addressController.text,
           dienThoai: _phoneController.text,
-          hinhAnh: _currentProfileImage, // Giữ nguyên ảnh
+          hinhAnh: _currentProfileImage,
           ghiChu: _notesController.text,
         );
-        await dbHelper.updateKhachHang(
-          khachHang.toMap(),
-        ); // Cần thêm updateKhachHang vào DatabaseHelper
+        await dbHelper.updateKhachHang(khachHang.toMap());
         updateSuccess = true;
       } else if (_currentUser!.maVaiTro == 'NV' ||
           _currentUser!.maVaiTro == 'QL') {
+        // Kiểm tra chức vụ không phải "Quản Lý" nếu là nhân viên
+        if (_currentUser!.maVaiTro == 'NV' &&
+            _chucVuController.text.toLowerCase() == 'quản lý') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Nhân viên không thể chọn chức vụ Quản Lý.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
         final nhanVien = NhanVien(
           maNhanVien: _currentRoleSpecificId!,
           tenNhanVien: _usernameController.text,
           chucVu: _chucVuController.text,
           diaChi: _addressController.text,
           dienThoai: _phoneController.text,
-          hinhAnh: _currentProfileImage, // Giữ nguyên ảnh
+          hinhAnh: _currentProfileImage,
           ghiChu: _notesController.text,
         );
-        await dbHelper.updateNhanVien(
-          nhanVien.toMap(),
-        ); // Cần thêm updateNhanVien vào DatabaseHelper
+        await dbHelper.updateNhanVien(nhanVien.toMap());
         updateSuccess = true;
       }
 
-      // views/ThongTinCaNhan.dart
-      // ...
       if (updateSuccess) {
-        // Cập nhật lại currentUser trong AuthController
         Provider.of<AuthController>(context, listen: false).updateCurrentUser(
           User(
             maNguoiDung: _currentUser!.maNguoiDung,
             tenDangNhap: _usernameController.text,
-            matKhau: _currentUser!.matKhau, // <--- THÊM DÒNG NÀY
+            matKhau: _currentUser!.matKhau,
             email: _emailController.text,
             maVaiTro: _currentUser!.maVaiTro,
             maLienQuan: _currentRoleSpecificId,
+            hinhAnh: _currentProfileImage,
           ),
         );
-        // ...
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -202,19 +221,43 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.white,
-                  backgroundImage:
-                      _currentProfileImage != null
-                          ? AssetImage(
-                            'assets/HinhAnh/KhachHang/${_currentProfileImage}',
-                          ) // Tùy chỉnh đường dẫn ảnh NV
-                          : null,
-                  child:
-                      _currentProfileImage == null
-                          ? Icon(Icons.person, size: 60, color: Colors.grey)
-                          : null,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.white,
+                      backgroundImage:
+                          _selectedImage != null
+                              ? FileImage(_selectedImage!)
+                              : _currentProfileImage != null
+                              ? AssetImage(
+                                _currentUser!.maVaiTro == 'KH'
+                                    ? 'assets/HinhAnh/KhachHang/$_currentProfileImage'
+                                    : 'assets/HinhAnh/NhanVien/$_currentProfileImage',
+                              )
+                              : null,
+                      child:
+                          _currentProfileImage == null && _selectedImage == null
+                              ? Icon(Icons.person, size: 60, color: Colors.grey)
+                              : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Color(0xFFFFB2D9),
+                          child: Icon(
+                            Icons.camera_alt,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(height: 20),
@@ -223,13 +266,17 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
                 decoration: InputDecoration(
                   labelText: 'Tên đăng nhập',
                   prefixIcon: Icon(Icons.person, color: Color(0xFFFFB2D9)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Tên đăng nhập không được để trống.';
-                  }
-                  return null;
-                },
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty
+                            ? 'Tên đăng nhập không được để trống.'
+                            : null,
               ),
               SizedBox(height: 20),
               TextFormField(
@@ -238,37 +285,64 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
                 decoration: InputDecoration(
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.email, color: Color(0xFFFFB2D9)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  if (value == null || value.isEmpty)
                     return 'Email không được để trống.';
-                  }
-                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                  if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value))
                     return 'Email không hợp lệ.';
-                  }
                   return null;
                 },
               ),
               SizedBox(height: 20),
-              if (_currentUser!.maVaiTro == 'NV' ||
-                  _currentUser!.maVaiTro == 'QL')
+              if (_currentUser!.maVaiTro == 'NV')
                 TextFormField(
                   controller: _chucVuController,
-                  readOnly:
-                      true, // Chức vụ thường không được chỉnh sửa bởi người dùng
                   decoration: InputDecoration(
                     labelText: 'Chức vụ',
                     prefixIcon: Icon(Icons.work, color: Color(0xFFFFB2D9)),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  validator:
+                      (value) =>
+                          value == null || value.isEmpty
+                              ? 'Chức vụ không được để trống.'
+                              : null,
+                ),
+              if (_currentUser!.maVaiTro == 'QL')
+                TextFormField(
+                  controller: _chucVuController,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Chức vụ',
+                    prefixIcon: Icon(Icons.work, color: Color(0xFFFFB2D9)),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              if (_currentUser!.maVaiTro == 'NV' ||
-                  _currentUser!.maVaiTro == 'QL')
-                SizedBox(height: 20),
+              SizedBox(height: 20),
               TextFormField(
                 controller: _addressController,
                 decoration: InputDecoration(
                   labelText: 'Địa chỉ',
                   prefixIcon: Icon(Icons.location_on, color: Color(0xFFFFB2D9)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               SizedBox(height: 20),
@@ -278,6 +352,11 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
                 decoration: InputDecoration(
                   labelText: 'Số điện thoại',
                   prefixIcon: Icon(Icons.phone, color: Color(0xFFFFB2D9)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               SizedBox(height: 20),
@@ -287,16 +366,28 @@ class _ThongTinCaNhanState extends State<ThongTinCaNhan> {
                 decoration: InputDecoration(
                   labelText: 'Ghi chú',
                   prefixIcon: Icon(Icons.note, color: Color(0xFFFFB2D9)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               SizedBox(height: 30),
               Center(
                 child: ElevatedButton.icon(
                   onPressed: _updateUserProfile,
-                  icon: Icon(Icons.save),
-                  label: Text('Lưu Thay Đổi'),
+                  icon: Icon(Icons.save, color: Colors.white),
+                  label: Text(
+                    'Lưu Thay Đổi',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFE91E63),
                     padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),

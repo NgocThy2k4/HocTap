@@ -1,10 +1,9 @@
-// views/GioHang.dart (CẬP NHẬT)
-
+// views/GioHang.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../controllers/CartController.dart';
-import '../controllers/AuthController.dart'; // Import AuthController
+import '../controllers/AuthController.dart';
 import '../models/CartItem.dart';
 import 'ThanhToan.dart';
 
@@ -15,39 +14,37 @@ class GioHang extends StatelessWidget {
       locale: 'vi_VN',
       symbol: 'VNĐ',
     );
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
 
-    // Lắng nghe sự thay đổi của CartController
+    if (currentUser == null || currentUser.maVaiTro != 'KH') {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Giỏ Hàng',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Color(0xFFFFB2D9),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+        body: Center(
+          child: Text(
+            'Chỉ khách hàng mới có thể truy cập giỏ hàng.',
+            style: TextStyle(fontSize: 18, color: Colors.red),
+          ),
+        ),
+      );
+    }
+
     return Consumer<CartController>(
       builder: (context, cart, child) {
-        // Lấy thông tin người dùng hiện tại từ AuthController
-        final authController = Provider.of<AuthController>(
-          context,
-          listen: false,
-        );
-        final currentUser = authController.currentUser;
-
-        // Giỏ hàng chỉ hiển thị cho khách hàng hoặc hiển thị tất cả nếu là quản lý/nhân viên
-        // Logic phức tạp hơn nếu bạn muốn giỏ hàng theo từng khách hàng cụ thể khi quản lý/nhân viên xem
-        // Hiện tại, nếu là QL/NV thì sẽ thấy giỏ hàng của app chung, nếu là KH thì thấy giỏ hàng của session KH đó
-        final bool isCustomer = currentUser?.maVaiTro == 'KH';
-
-        // Filter giỏ hàng nếu cần theo người dùng, hiện tại CartController đang quản lý giỏ hàng chung
-        // Nếu bạn muốn giỏ hàng riêng cho từng KH/NV, CartController cần lưu trữ Map<String, List<CartItem>>
-        // hoặc load từ DB theo userId/ma_lien_quan
-        // Hiện tại, giỏ hàng là global của session. Logic "khách hàng chỉ hiển thị giỏ hàng của khách hàng đó"
-        // ngụ ý CartController cần persist giỏ hàng theo User ID.
-        // Để đơn giản, giả sử giỏ hàng là của người đang sử dụng ứng dụng.
-        // Nếu bạn muốn giỏ hàng riêng cho từng KH/NV và lưu trữ vào DB,
-        // bạn sẽ phải chỉnh sửa CartController đáng kể.
-        // Với setup hiện tại, giỏ hàng hoạt động theo session người dùng đang đăng nhập.
-
         return Scaffold(
           appBar: AppBar(
             title: Text(
               'Giỏ Hàng (${cart.totalItems})',
               style: TextStyle(
-                fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
             backgroundColor: Color(0xFFFFB2D9),
@@ -256,9 +253,6 @@ class GioHang extends StatelessWidget {
                                     cart.items.isEmpty
                                         ? null
                                         : () {
-                                          // TODO: Logic chuyển sang trang thanh toán.
-                                          // Có thể cần truyền thông tin người dùng vào trang ThanhToan
-                                          // để biết là khách hàng hay nhân viên/quản lý thanh toán.
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(

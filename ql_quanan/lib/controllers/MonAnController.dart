@@ -7,8 +7,34 @@ class MonAnController {
   final QLQuanAnDatabaseHelper _dbHelper = QLQuanAnDatabaseHelper.instance;
 
   Future<List<MonAn>> fetchAllMonAn() async {
-    return await _dbHelper.getAllMonAn();
+    final db = await _dbHelper.database;
+    final monAnMaps = await db.query('mon_an');
+    return monAnMaps.map((map) => MonAn.fromMap(map)).toList();
   }
+
+  Future<void> addMonAn(MonAn monAn) async {
+    final db = await _dbHelper.database;
+    await db.insert('mon_an', monAn.toMap());
+  }
+
+  Future<void> updateCurrentMonAn(MonAn monAn) async {
+    final db = await _dbHelper.database;
+    await db.update(
+      'mon_an',
+      monAn.toMap(),
+      where: 'ma_mon = ?',
+      whereArgs: [monAn.maMon],
+    );
+  }
+
+  Future<void> deleteMonAn(String maMon) async {
+    final db = await _dbHelper.database;
+    await db.delete('mon_an', where: 'ma_mon = ?', whereArgs: [maMon]);
+  }
+
+  // Future<List<MonAn>> fetchAllMonAn() async {
+  //   return await _dbHelper.getAllMonAn();
+  // }
 
   Future<MonAn?> fetchMonAnDetail(String maMon) async {
     return await _dbHelper.getMonAn(maMon);
