@@ -52,6 +52,7 @@ flutter:
     - assets/github_logo.png
 
     - assets/HinhAnh/Logo.jpg
+    - assets/HinhAnh/NenDangNhap.jpg
     - assets/HinhAnh/NenDangKy.jpg
     - assets/HinhAnh/LienHe.jpg
     - assets/HinhAnh/KhachHang/hinh1.jpg

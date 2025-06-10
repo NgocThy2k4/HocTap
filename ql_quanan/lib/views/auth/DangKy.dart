@@ -162,7 +162,7 @@ class _DangKyState extends State<DangKy> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Color(0xFFFF6790),
                     ),
                   ),
                   SizedBox(height: 30),
@@ -272,7 +272,7 @@ class _DangKyState extends State<DangKy> {
                             ),
                             Text(
                               'Khách hàng',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(color: Color(0xFFFF6790)),
                             ),
                             SizedBox(width: 20),
                             Radio<UserType>(
@@ -287,7 +287,7 @@ class _DangKyState extends State<DangKy> {
                             ),
                             Text(
                               'Nhân viên',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(color: Color(0xFFFF6790)),
                             ),
                           ],
                         ),
@@ -351,7 +351,7 @@ class _DangKyState extends State<DangKy> {
                     },
                     child: Text(
                       'Đã có tài khoản? Đăng nhập',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Color(0xFFFF6790)),
                     ),
                   ),
                 ],

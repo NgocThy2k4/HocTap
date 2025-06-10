@@ -86,7 +86,7 @@ class _DangNhapState extends State<DangNhap> {
           // Background Image
           Positioned.fill(
             child: Image.asset(
-              'assets/HinhAnh/NenDangKy.jpg', // Ảnh nền
+              'assets/HinhAnh/NenDangNhap.jpg', // Ảnh nền
               fit: BoxFit.cover,
             ),
           ),

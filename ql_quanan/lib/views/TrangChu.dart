@@ -131,9 +131,9 @@ class _TrangChuState extends State<TrangChu> {
                       // Dựa vào maVaiTro để chọn ảnh mặc định hoặc load ảnh của user
                       backgroundImage: AssetImage(
                         user?.maVaiTro == 'QL'
-                            ? 'assets/HinhAnh/NhanVien/default_employee.png'
+                            ? 'assets/HinhAnh/KhachHang/hinh1.jpg'
                             : user?.maVaiTro == 'NV'
-                            ? 'assets/HinhAnh/NhanVien/default_employee.png'
+                            ? 'assets/HinhAnh/KhachHang/hinh1.jpg'
                             : 'assets/HinhAnh/KhachHang/hinh1.jpg', // Default cho khách hàng
                       ),
                     ),
