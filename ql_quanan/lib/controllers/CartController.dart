@@ -55,7 +55,12 @@ class CartController extends ChangeNotifier {
             debugPrint('Không tìm thấy món ăn với mã: ${item['ma_mon']}');
             // Có thể trả về một CartItem với MonAn rỗng hoặc null, tùy vào logic của bạn
             return CartItem(
-              monAn: MonAn(maMon: '', tenMon: 'Unknown', donGia: 0.0),
+              monAn: MonAn(
+                maMon: '',
+                tenMon: 'Unknown',
+                donGia: 0.0,
+                maLoai: '', // <-- THÊM DÒNG NÀY VÀO
+              ),
               quantity: 0,
             ); // Ví dụ: trả về CartItem rỗng
           }

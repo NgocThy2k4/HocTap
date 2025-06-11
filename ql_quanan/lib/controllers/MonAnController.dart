@@ -44,7 +44,7 @@ class MonAnController {
     String maLoai,
     String currentMaMon,
   ) async {
-    final List<MonAn> allMonAn = await _dbHelper.getAllMonAn();
+    final List<MonAn> allMonAn = await _dbHelper.getAllMonAn2();
     return allMonAn
         .where((mon) => mon.maLoai == maLoai && mon.maMon != currentMaMon)
         .toList();

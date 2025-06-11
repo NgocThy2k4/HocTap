@@ -1,25 +1,10 @@
-// views/TrangChu.dart
-
+// views/TrangChu.dart (Đã sửa lỗi)
 import 'package:flutter/material.dart';
-import 'package:carousel_slider/carousel_slider.dart';
-import 'package:provider/provider.dart';
-import '../controllers/AuthController.dart';
-import '../controllers/MonAnController.dart';
-import '../controllers/CartController.dart';
+import '../database/DatabaseHelper.dart';
 import '../models/MonAn.dart';
-import 'DanhSachMonAn.dart';
-import 'GioHang.dart';
-import 'ThanhToan.dart';
-import 'TheoDoiDonHang.dart';
-import 'DanhGiaNhanXet.dart';
-import 'ThongBaoKhuyenMai.dart';
-import 'QuanLyDonHang.dart';
-import 'QuanLyThucDon.dart';
-import 'TheoDoiPhanHoi.dart';
-import 'ThongTinCaNhan.dart';
+import '../models/KhachHang.dart';
 import 'TrangLienHe.dart';
-import 'auth/DangNhap.dart';
-import 'admin/AdminDashboard.dart';
+import 'ChiTietMonAn.dart'; // Giả định có trang chi tiết món ăn
 
 class TrangChu extends StatefulWidget {
   @override
@@ -27,469 +12,409 @@ class TrangChu extends StatefulWidget {
 }
 
 class _TrangChuState extends State<TrangChu> {
-  final MonAnController _monAnController = MonAnController();
-  List<MonAn> _mostPopularFoods = [];
-  bool _isLoadingPopular = true;
+  final QLQuanAnDatabaseHelper _dbHelper = QLQuanAnDatabaseHelper.instance;
+  final TextEditingController _searchController = TextEditingController();
+  List<MonAn> _monAnList = [];
+  List<MonAn> _filteredMonAnList = [];
+  List<Map<String, dynamic>> _promotions = [];
+  List<Map<String, dynamic>> _reviews = [];
+  String? _selectedLoaiMonAn;
+  List<String> _loaiMonAnList = [];
 
   @override
   void initState() {
     super.initState();
-    _loadPopularFoods();
+    _loadData();
+    _searchController.addListener(_filterMonAn);
   }
 
-  Future<void> _loadPopularFoods() async {
+  Future<void> _loadData() async {
+    // Load món ăn
+    _monAnList = await _dbHelper.getAllMonAn2();
+    _filteredMonAnList = _monAnList;
+
+    // Load loại món ăn
+    final loaiMonAnMaps = await _dbHelper.database.then(
+      (db) => db.query('loai_mon_an'),
+    );
+    _loaiMonAnList =
+        loaiMonAnMaps.map((map) => map['ten_loai'] as String).toList();
+
+    // Load khuyến mãi
+    _promotions = await _dbHelper.getAllPromotions();
+
+    // Load đánh giá
+    _reviews = await _dbHelper.getAllReviews();
+
+    setState(() {});
+  }
+
+  void _filterMonAn() {
+    final query = _searchController.text.toLowerCase();
     setState(() {
-      _isLoadingPopular = true;
-    });
-    _mostPopularFoods = await _monAnController.fetchAllMonAn();
-    _mostPopularFoods.sort((a, b) => b.donGia!.compareTo(a.donGia!));
-    _mostPopularFoods = _mostPopularFoods.take(5).toList();
-    setState(() {
-      _isLoadingPopular = false;
+      _filteredMonAnList =
+          _monAnList.where((monAn) {
+            final tenMon = monAn.tenMon?.toLowerCase() ?? '';
+            final matchLoai =
+                _selectedLoaiMonAn == null ||
+                monAn.maLoai ==
+                    (_loaiMonAnList.indexOf(_selectedLoaiMonAn!) + 1)
+                        .toString()
+                        .padLeft(2, '0');
+            return tenMon.contains(query) && matchLoai;
+          }).toList();
     });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final authController = Provider.of<AuthController>(context);
-    final user = authController.currentUser;
-    final bool isAdmin = user != null && user.maVaiTro == 'QL';
-    final bool isStaff = user != null && user.maVaiTro == 'NV';
-    final bool isCustomer = user != null && user.maVaiTro == 'KH';
-    final String avatarImagePath =
-        user?.hinhAnh ?? 'assets/HinhAnh/KhachHang/default_user.jpg';
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: AssetImage('assets/HinhAnh/Logo.jpg'),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Quán Ăn Ngon',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        title: Text(
+          'Quán Ăn Ngon',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Color(0xFFFFB2D9),
-        iconTheme: IconThemeData(color: Colors.white),
         actions: [
-          if (isCustomer)
-            Stack(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.shopping_cart, color: Colors.white),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => GioHang()),
-                    );
-                  },
-                ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Consumer<CartController>(
-                    builder: (context, cart, child) {
-                      return Visibility(
-                        visible: cart.totalItems > 0,
-                        child: Container(
-                          padding: EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            '${cart.totalItems}',
-                            style: TextStyle(color: Colors.white, fontSize: 10),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          IconButton(
+            icon: Icon(Icons.search, color: Colors.white),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: MonAnSearchDelegate(_monAnList),
+              );
+            },
+          ),
         ],
       ),
       backgroundColor: Color(0xFFFCE4EC),
-      drawer: Drawer(
-        child: Container(
-          color: Colors.pink[50],
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: <Widget>[
-              DrawerHeader(
-                decoration: BoxDecoration(color: Color(0xFFFFB2D9)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.white,
-                      backgroundImage: AssetImage(avatarImagePath),
-                      onBackgroundImageError: (exception, stackTrace) {
-                        debugPrint(
-                          'Lỗi tải ảnh đại diện: $avatarImagePath, Lỗi: $exception',
-                        );
-                      },
-                    ),
-                    Text(
-                      user?.tenDangNhap ?? 'Khách',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      user?.email ?? 'Chưa đăng nhập',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thanh tìm kiếm và bộ lọc
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Tìm kiếm món ăn...',
+                  prefixIcon: Icon(Icons.search, color: Color(0xFFE91E63)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-              ListTile(
-                leading: Icon(Icons.home, color: Color(0xFFE91E63)),
-                title: Text(
-                  'Trang Chủ',
-                  style: TextStyle(color: Colors.pink[800]),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
+              SizedBox(height: 10),
+              DropdownButton<String>(
+                value: _selectedLoaiMonAn,
+                hint: Text('Chọn loại món ăn'),
+                isExpanded: true,
+                items:
+                    _loaiMonAnList
+                        .map(
+                          (loai) =>
+                              DropdownMenuItem(value: loai, child: Text(loai)),
+                        )
+                        .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedLoaiMonAn = value;
+                    _filterMonAn();
+                  });
                 },
               ),
-              ListTile(
-                leading: Icon(Icons.restaurant_menu, color: Color(0xFFE91E63)),
-                title: Text(
-                  'Thực Đơn',
-                  style: TextStyle(color: Colors.pink[800]),
+              SizedBox(height: 20),
+
+              // Thực Đơn Nổi Bật
+              Text(
+                'Thực Đơn Nổi Bật',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE91E63),
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TrangDanhSachMonAn(),
-                    ),
-                  );
-                },
               ),
-              if (isCustomer) ...[
-                ListTile(
-                  leading: Icon(Icons.shopping_cart, color: Color(0xFFE91E63)),
-                  title: Text(
-                    'Giỏ Hàng',
-                    style: TextStyle(color: Colors.pink[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => GioHang()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.history, color: Color(0xFFE91E63)),
-                  title: Text(
-                    'Theo Dõi Đơn Hàng',
-                    style: TextStyle(color: Colors.pink[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => TheoDoiDonHang()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.star, color: Color(0xFFE91E63)),
-                  title: Text(
-                    'Đánh Giá và Nhận Xét',
-                    style: TextStyle(color: Colors.pink[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => DanhGiaNhanXet()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.notifications, color: Color(0xFFE91E63)),
-                  title: Text(
-                    'Thông Báo Khuyến Mãi',
-                    style: TextStyle(color: Colors.pink[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ThongBaoKhuyenMai(),
+              SizedBox(height: 10),
+              SizedBox(
+                height: 200,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount:
+                      _filteredMonAnList.length > 5
+                          ? 5
+                          : _filteredMonAnList.length,
+                  itemBuilder: (context, index) {
+                    final monAn = _filteredMonAnList[index];
+                    return GestureDetector(
+                      onTap:
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              // SỬA LỖI 1: Truyền vào monAn.maMon thay vì biến maMon không tồn tại
+                              builder:
+                                  (context) =>
+                                      ChiTietMonAn(maMon: monAn.maMon!),
+                            ),
+                          ),
+                      child: Card(
+                        child: Column(
+                          children: [
+                            Image.asset(
+                              'assets/HinhAnh/MonAn/${monAn.hinh ?? 'default_food.png'}',
+                              height: 120,
+                              width: 150,
+                              fit: BoxFit.cover,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    monAn.tenMon ?? '',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${monAn.donGia} VNĐ',
+                                    style: TextStyle(color: Color(0xFFE91E63)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
                 ),
-              ],
-              if (isStaff || isAdmin) ...[
-                Divider(color: Colors.pink[200]),
-                ListTile(
-                  leading: Icon(Icons.list_alt, color: Colors.deepPurple),
-                  title: Text(
-                    'Quản Lý Đơn Hàng',
-                    style: TextStyle(color: Colors.deepPurple[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => QuanLyDonHang()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.feedback, color: Colors.deepPurple),
-                  title: Text(
-                    'Theo Dõi Phản Hồi',
-                    style: TextStyle(color: Colors.deepPurple[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => TheoDoiPhanHoi()),
-                    );
-                  },
-                ),
-              ],
-              if (isAdmin) ...[
-                ListTile(
-                  leading: Icon(Icons.restaurant, color: Colors.deepPurple),
-                  title: Text(
-                    'Quản Lý Thực Đơn',
-                    style: TextStyle(color: Colors.deepPurple[800]),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => QuanLyThucDon()),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.admin_panel_settings,
-                    color: Colors.deepPurple,
-                  ),
-                  title: Text(
-                    'Bảng Điều Khiển Quản Lý',
-                    style: TextStyle(
-                      color: Colors.deepPurple[800],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => AdminDashboard()),
-                    );
-                  },
-                ),
-              ],
-              Divider(color: Colors.pink[200]),
-              ListTile(
-                leading: Icon(Icons.contact_mail, color: Color(0xFFE91E63)),
-                title: Text(
-                  'Liên Hệ',
-                  style: TextStyle(color: Colors.pink[800]),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => TrangLienHe()),
-                  );
-                },
               ),
-              ListTile(
-                leading: Icon(Icons.person, color: Color(0xFFE91E63)),
-                title: Text(
-                  'Thông tin cá nhân',
-                  style: TextStyle(color: Colors.pink[800]),
+              SizedBox(height: 20),
+
+              // Khuyến Mãi và Sự Kiện
+              Text(
+                'Khuyến Mãi và Sự Kiện',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE91E63),
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => ThongTinCaNhan()),
-                  );
-                },
               ),
-              ListTile(
-                leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Đăng Xuất', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  authController.logout();
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => DangNhap()),
-                    (Route<dynamic> route) => false,
-                  );
-                },
+              SizedBox(height: 10),
+              _promotions.isEmpty
+                  ? Text('Hiện không có khuyến mãi.')
+                  : Column(
+                    children:
+                        _promotions
+                            .map(
+                              (promo) => Card(
+                                child: ListTile(
+                                  title: Text(promo['tieu_de'] ?? ''),
+                                  subtitle: Text(promo['noi_dung'] ?? ''),
+                                  trailing: Text(
+                                    '${promo['ngay_bat_dau']} - ${promo['ngay_ket_thuc']}',
+                                    style: TextStyle(color: Color(0xFFE91E63)),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+              SizedBox(height: 20),
+
+              // Giới Thiệu Quán
+              Text(
+                'Giới Thiệu Quán',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE91E63),
+                ),
+              ),
+              SizedBox(height: 10),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Quán Ăn Ngon mang đến trải nghiệm ẩm thực tuyệt vời với các món ăn đậm chất Việt Nam, không gian ấm cúng và dịch vụ tận tâm.',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Đánh Giá Khách Hàng
+              Text(
+                'Đánh Giá Khách Hàng',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE91E63),
+                ),
+              ),
+              SizedBox(height: 10),
+              _reviews.isEmpty
+                  ? Text('Chưa có đánh giá nào.')
+                  : Column(
+                    children:
+                        _reviews
+                            .take(3)
+                            .map(
+                              (review) => FutureBuilder<Map<String, dynamic>?>(
+                                future: _dbHelper.getKhachHangByMa(
+                                  review['ma_khach_hang'],
+                                ),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData)
+                                    return SizedBox.shrink();
+                                  final khachHang = KhachHang.fromMap(
+                                    snapshot.data!,
+                                  );
+                                  return Card(
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundImage: AssetImage(
+                                          'assets/HinhAnh/KhachHang/${khachHang.hinhAnh ?? 'hinh1.jpg'}',
+                                        ),
+                                      ),
+                                      title: Text(
+                                        khachHang.tenKhachHang ?? 'Khách Hàng',
+                                      ),
+                                      subtitle: Text(review['nhan_xet'] ?? ''),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: List.generate(
+                                          5,
+                                          (i) => Icon(
+                                            i < review['danh_gia']
+                                                ? Icons.star
+                                                : Icons.star_border,
+                                            color: Colors.yellow,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                            .toList(),
+                  ),
+              SizedBox(height: 20),
+
+              // Thông Tin Liên Hệ
+              Text(
+                'Thông Tin Liên Hệ',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE91E63),
+                ),
+              ),
+              SizedBox(height: 10),
+              Card(
+                child: ListTile(
+                  leading: Icon(Icons.contact_phone, color: Color(0xFFE91E63)),
+                  title: Text('Liên hệ với chúng tôi'),
+                  subtitle: Text('140 Lê Trọng Tấn, SĐT: 0334909123'),
+                  trailing: Icon(Icons.arrow_forward_ios),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => TrangLienHe()),
+                      ),
+                ),
               ),
             ],
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Món Ăn Phổ Biến Nhất',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFE91E63),
+    );
+  }
+}
+
+class MonAnSearchDelegate extends SearchDelegate {
+  final List<MonAn> monAnList;
+
+  MonAnSearchDelegate(this.monAnList);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [IconButton(icon: Icon(Icons.clear), onPressed: () => query = '')];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final results =
+        monAnList
+            .where(
+              (monAn) =>
+                  monAn.tenMon!.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final monAn = results[index];
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: AssetImage(
+              'assets/HinhAnh/MonAn/${monAn.hinh ?? 'default_food.png'}',
+            ),
+          ),
+          title: Text(monAn.tenMon ?? ''),
+          subtitle: Text('${monAn.donGia} VNĐ'),
+          onTap:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  // SỬA LỖI 2: Truyền vào monAn.maMon thay vì monAn
+                  builder: (context) => ChiTietMonAn(maMon: monAn.maMon!),
                 ),
               ),
-            ),
-            _isLoadingPopular
-                ? Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFFFFB2D9),
-                    ),
-                  ),
-                )
-                : _mostPopularFoods.isEmpty
-                ? Center(
-                  child: Text('Không có món ăn phổ biến nào để hiển thị.'),
-                )
-                : CarouselSlider.builder(
-                  itemCount: _mostPopularFoods.length,
-                  itemBuilder: (
-                    BuildContext context,
-                    int itemIndex,
-                    int pageViewIndex,
-                  ) {
-                    final monAn = _mostPopularFoods[itemIndex];
-                    return Container(
-                      width: MediaQuery.of(context).size.width,
-                      margin: EdgeInsets.symmetric(horizontal: 5.0),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 2,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(15),
-                              ),
-                              child: Image.asset(
-                                'assets/HinhAnh/MonAn/${monAn.hinh}',
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                errorBuilder:
-                                    (context, error, stackTrace) =>
-                                        Center(child: Text('No Image')),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              monAn.tenMon,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  options: CarouselOptions(
-                    height: 250,
-                    autoPlay: true,
-                    enlargeCenterPage: true,
-                    aspectRatio: 16 / 9,
-                    autoPlayCurve: Curves.fastOutSlowIn,
-                    enableInfiniteScroll: true,
-                    autoPlayAnimationDuration: Duration(milliseconds: 800),
-                    viewportFraction: 0.8,
-                  ),
-                ),
-            SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                'Thực Đơn Đa Dạng',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFE91E63),
-                ),
-              ),
-            ),
-            SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Center(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TrangDanhSachMonAn(),
-                      ),
-                    );
-                  },
-                  icon: Icon(Icons.menu_book),
-                  label: Text('Xem Toàn Bộ Thực Đơn'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 25, vertical: 12),
-                    backgroundColor: Color(0xFFFF6790),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 20),
-          ],
-        ),
-      ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final suggestions =
+        monAnList
+            .where(
+              (monAn) =>
+                  monAn.tenMon!.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
+    return ListView.builder(
+      itemCount: suggestions.length,
+      itemBuilder: (context, index) {
+        final monAn = suggestions[index];
+        return ListTile(
+          title: Text(monAn.tenMon ?? ''),
+          onTap: () {
+            query = monAn.tenMon ?? '';
+            showResults(context);
+          },
+        );
+      },
     );
   }
 }

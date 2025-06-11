@@ -1,4 +1,5 @@
 // views/admin/QuanLyNhanVienPage.dart
+
 import 'package:flutter/material.dart';
 import '../../database/DatabaseHelper.dart';
 import '../../models/NhanVien.dart';
@@ -24,9 +25,20 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
 
   Future<void> _loadNhanVien() async {
     setState(() => _isLoading = true);
-    _nhanVienList = await _dbHelper.getAllNhanVien();
-    _filteredNhanVienList = _nhanVienList;
-    setState(() => _isLoading = false);
+    try {
+      _nhanVienList = await _dbHelper.getAllNhanVien();
+      _filteredNhanVienList = _nhanVienList;
+    } catch (e) {
+      debugPrint('Lỗi khi tải dữ liệu nhân viên: $e');
+      if (mounted) {
+        // Kiểm tra mounted trước khi dùng context sau async
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi khi tải dữ liệu: $e')));
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _filterNhanVien() {
@@ -41,6 +53,13 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
   }
 
   Future<void> _showAddEditDialog({NhanVien? nhanVien}) async {
+    final bool isEditing = nhanVien != null;
+    final TextEditingController maNhanVienController = TextEditingController(
+      text:
+          isEditing
+              ? nhanVien!.maNhanVien
+              : 'NV${DateTime.now().millisecondsSinceEpoch}', // Mã NV tạm thời
+    );
     final TextEditingController tenController = TextEditingController(
       text: nhanVien?.tenNhanVien,
     );
@@ -56,91 +75,238 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
     final TextEditingController ghiChuController = TextEditingController(
       text: nhanVien?.ghiChu,
     );
+    final TextEditingController hinhAnhController = TextEditingController(
+      text: nhanVien?.hinhAnh,
+    );
+
+    // Thêm logic để tạo mã nhân viên mới dạng NV01, NV02,...
+    if (!isEditing) {
+      final nextIdNum =
+          await _dbHelper.getNextMaNhanVien(); // Giả sử có hàm này
+      maNhanVienController.text =
+          'NV${nextIdNum.toString().padLeft(2, '0')}'; // NV01, NV02...
+    }
 
     await showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text(nhanVien == null ? 'Thêm Nhân Viên' : 'Sửa Nhân Viên'),
+          (dialogContext) => AlertDialog(
+            // Đổi tên context trong builder để tránh nhầm lẫn
+            title: Text(
+              isEditing ? 'Sửa Nhân Viên' : 'Thêm Nhân Viên',
+              style: TextStyle(color: Color(0xFFE91E63)),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
-                    controller: tenController,
-                    decoration: InputDecoration(labelText: 'Tên nhân viên'),
+                    controller: maNhanVienController,
+                    readOnly: true, // Mã nhân viên không cho chỉnh sửa
+                    decoration: InputDecoration(
+                      labelText: 'Mã nhân viên',
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: tenController,
+                    decoration: InputDecoration(
+                      labelText: 'Tên nhân viên',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: chucVuController,
-                    decoration: InputDecoration(labelText: 'Chức vụ'),
+                    decoration: InputDecoration(
+                      labelText: 'Chức vụ',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: diaChiController,
-                    decoration: InputDecoration(labelText: 'Địa chỉ'),
+                    decoration: InputDecoration(
+                      labelText: 'Địa chỉ',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: dienThoaiController,
-                    decoration: InputDecoration(labelText: 'Số điện thoại'),
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Số điện thoại',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: hinhAnhController,
+                    decoration: InputDecoration(
+                      labelText: 'Tên file hình ảnh (VD: avatar.png)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: ghiChuController,
-                    decoration: InputDecoration(labelText: 'Ghi chú'),
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Ghi chú',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Hủy'),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
               ),
-              TextButton(
+              ElevatedButton(
                 onPressed: () async {
                   if (tenController.text.isEmpty ||
-                      chucVuController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                      chucVuController.text.isEmpty ||
+                      diaChiController.text.isEmpty ||
+                      dienThoaiController.text.isEmpty) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      // Sử dụng dialogContext
                       SnackBar(
-                        content: Text('Vui lòng nhập đầy đủ thông tin.'),
+                        content: Text(
+                          'Vui lòng nhập đầy đủ thông tin bắt buộc.',
+                        ),
+                        backgroundColor: Colors.red,
                       ),
                     );
                     return;
                   }
 
                   final newNhanVien = NhanVien(
-                    maNhanVien:
-                        nhanVien?.maNhanVien ??
-                        'NV${DateTime.now().millisecondsSinceEpoch}',
+                    maNhanVien: maNhanVienController.text,
                     tenNhanVien: tenController.text,
                     chucVu: chucVuController.text,
                     diaChi: diaChiController.text,
                     dienThoai: dienThoaiController.text,
-                    hinhAnh: nhanVien?.hinhAnh ?? 'default_han_vien.jpg',
+                    hinhAnh:
+                        hinhAnhController.text.isNotEmpty
+                            ? hinhAnhController.text
+                            : 'default_nv.png', // Default image
                     ghiChu: ghiChuController.text,
                   );
 
-                  if (nhanVien == null) {
-                    await _dbHelper.insertNhanVien(newNhanVien.toMap());
-                  } else {
-                    await _dbHelper.updateNhanVien(newNhanVien.toMap());
-                  }
-
-                  _loadNhanVien();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        nhanVien == null
-                            ? 'Thêm nhân viên thành công.'
-                            : 'Cập nhật nhân viên thành công.',
+                  try {
+                    if (isEditing) {
+                      await _dbHelper.updateNhanVien(newNhanVien.toMap());
+                    } else {
+                      await _dbHelper.insertNhanVien(newNhanVien.toMap());
+                    }
+                    _loadNhanVien();
+                    Navigator.pop(dialogContext); // Sử dụng dialogContext
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      // Sử dụng dialogContext
+                      SnackBar(
+                        content: Text(
+                          isEditing
+                              ? 'Cập nhật nhân viên thành công.'
+                              : 'Thêm nhân viên thành công.',
+                        ),
+                        backgroundColor: Colors.green,
                       ),
-                    ),
-                  );
+                    );
+                  } catch (e) {
+                    debugPrint('Lỗi khi lưu nhân viên: $e');
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      // Sử dụng dialogContext
+                      SnackBar(
+                        content: Text('Lỗi khi lưu nhân viên: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFE91E63),
+                  foregroundColor: Colors.white,
+                ),
                 child: Text('Lưu'),
               ),
             ],
           ),
     );
+  }
+
+  // Hàm _deleteNhanVien mới nhận BuildContext làm tham số
+  Future<void> _deleteNhanVien(BuildContext context, String maNhanVien) async {
+    final confirm = await showDialog<bool>(
+      context: context, // Sử dụng context được truyền vào
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Color(0xFFE91E63)),
+            ),
+            content: Text('Bạn có chắc muốn xóa nhân viên này?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Xóa', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+    );
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteNhanVien(maNhanVien);
+        _loadNhanVien();
+        if (mounted) {
+          // Kiểm tra mounted trước khi dùng context sau async
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã xóa nhân viên.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Lỗi khi xóa nhân viên: $e');
+        if (mounted) {
+          // Kiểm tra mounted trước khi dùng context sau async
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi khi xóa nhân viên: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -153,14 +319,18 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Quản Lý Nhân Viên', style: TextStyle(color: Colors.white)),
+        title: Text(
+          'Quản Lý Nhân Viên',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Color(0xFFFFB2D9),
         iconTheme: IconThemeData(color: Colors.white),
       ),
+      backgroundColor: Color(0xFFFCE4EC),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -177,7 +347,11 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
           Expanded(
             child:
                 _isLoading
-                    ? Center(child: CircularProgressIndicator())
+                    ? Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFE91E63),
+                      ),
+                    )
                     : _filteredNhanVienList.isEmpty
                     ? Center(child: Text('Không có nhân viên nào.'))
                     : ListView.builder(
@@ -185,14 +359,30 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
                       itemBuilder: (context, index) {
                         final nv = _filteredNhanVienList[index];
                         return Card(
-                          margin: EdgeInsets.all(8.0),
+                          color: Colors.white,
+                          margin: EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundImage: AssetImage(
-                                'assets/HinhAnh/NhanVien/${nv.hinhAnh ?? 'default_han_vien.jpg'}',
+                                'assets/HinhAnh/NhanVien/${nv.hinhAnh ?? 'default_nv.png'}', // Default image
                               ),
+                              onBackgroundImageError: (exception, stackTrace) {
+                                debugPrint(
+                                  'Lỗi tải ảnh nhân viên: ${nv.hinhAnh ?? 'default_nv.png'}, Lỗi: $exception',
+                                );
+                              },
                             ),
-                            title: Text(nv.tenNhanVien ?? 'Chưa có tên'),
+                            title: Text(
+                              nv.tenNhanVien ?? 'Chưa có tên',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                             subtitle: Text(
                               '${nv.chucVu ?? ''} - ${nv.dienThoai ?? ''}',
                             ),
@@ -200,50 +390,17 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  onPressed: () => _showAddEditDialog(nv),
+                                  onPressed:
+                                      () => _showAddEditDialog(nhanVien: nv),
                                   icon: Icon(Icons.edit, color: Colors.blue),
                                 ),
                                 IconButton(
                                   onPressed: () async {
-                                    final confirm = await showDialog<bool>(
+                                    // Gọi hàm _deleteNhanVien mới, truyền context vào
+                                    await _deleteNhanVien(
                                       context,
-                                      builder:
-                                          (context) => AlertDialog(
-                                            title: Text('Xác nhận xóa'),
-                                            content: Text(
-                                              'Bạn có chắc muốn xóa nhân viên này?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      false,
-                                                    ),
-                                                child: Text('Hủy'),
-                                              ),
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      true,
-                                                    ),
-                                                child: Text('Xóa'),
-                                              ),
-                                            ],
-                                          ),
+                                      nv.maNhanVien,
                                     );
-                                    if (confirm == true) {
-                                      await _dbHelper.deleteNhanVien(nv.maNhan);
-                                      _loadNhanVien();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Đã xóa nhân viên.'),
-                                        ),
-                                      );
-                                    }
                                   },
                                   icon: Icon(Icons.delete, color: Colors.red),
                                 ),
@@ -258,8 +415,8 @@ class _QuanLyNhanVienPageState extends State<QuanLyNhanVienPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddEditDialog(),
-        child: Icon(Icons.add),
-        backgroundColor: Color(0xFFFFB2D9),
+        child: Icon(Icons.add, color: Colors.white),
+        backgroundColor: Color(0xFFE91E63),
       ),
     );
   }

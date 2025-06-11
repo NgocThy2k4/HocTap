@@ -294,7 +294,7 @@ class QLQuanAnDatabaseHelper {
   }
 
   // MonAn methods
-  Future<List<MonAn>> getAllMonAn() async {
+  Future<List<MonAn>> getAllMonAn2() async {
     final db = await database;
     final result = await db.query('mon_an');
     return result.map((map) => MonAn.fromMap(map)).toList();
@@ -656,5 +656,59 @@ class QLQuanAnDatabaseHelper {
       await db.execute('ALTER TABLE promotions ADD COLUMN gia_tri_giam REAL');
       await db.execute('ALTER TABLE reviews ADD COLUMN ngay_danh_gia TEXT');
     }
+  }
+
+  // Phương thức cho MonAn
+  Future<List<Map<String, dynamic>>> getAllMonAn() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('MonAn');
+    return maps;
+  }
+
+  Future<int> insertMonAn(Map<String, dynamic> monAn) async {
+    final db = await instance.database;
+    return await db.insert(
+      'MonAn',
+      monAn,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<int> updateMonAn(Map<String, dynamic> monAn) async {
+    final db = await instance.database;
+    return await db.update(
+      'MonAn',
+      monAn,
+      where: 'ma_mon_an = ?',
+      whereArgs: [monAn['ma_mon_an']],
+    );
+  }
+
+  // Thêm phương thức này vào class QLQuanAnDatabaseHelper
+  Future<int> getNextMaMonAn() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+      "SELECT MAX(CAST(SUBSTR(ma_mon, 3) AS INTEGER)) as maxId FROM mon_an",
+    );
+    // Kiểm tra nếu không có bản ghi nào, maxId sẽ là null.
+    // Nếu có, lấy giá trị và cộng 1.
+    final int? maxId = maps.isNotEmpty ? maps[0]['maxId'] : null;
+    return (maxId ?? 0) + 1;
+  }
+
+  Future<int> getNextMaNhanVien() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+      "SELECT MAX(CAST(SUBSTR(ma_nhan_vien, 3) AS INTEGER)) as maxId FROM nhan_vien",
+    );
+    final int? maxId = maps.isNotEmpty ? maps[0]['maxId'] : null;
+    return (maxId ?? 0) + 1;
+  }
+
+  // Phương thức cho LoaiMonAn
+  Future<List<Map<String, dynamic>>> getAllLoaiMonAn() async {
+    final db = await instance.database;
+    final List<Map<String, dynamic>> maps = await db.query('LoaiMonAn');
+    return maps;
   }
 }

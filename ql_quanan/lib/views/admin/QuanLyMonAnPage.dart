@@ -1,8 +1,13 @@
 // views/admin/QuanLyMonAnPage.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:path/path.dart'
+    as p; // Đảm bảo đã thêm alias để tránh xung đột 'context'
+
 import '../../database/DatabaseHelper.dart';
 import '../../models/MonAn.dart';
+import '../../models/LoaiMonAn.dart'; // Import LoaiMonAn model nếu bạn dùng trực tiếp
 import '../../controllers/CartController.dart';
 
 class QuanLyMonAnPage extends StatefulWidget {
@@ -15,7 +20,8 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _monAnList = [];
   List<Map<String, dynamic>> _filteredMonAnList = [];
-  List<Map<String, dynamic>> _loaiMonAnList = [];
+  List<Map<String, dynamic>> _loaiMonAnList =
+      []; // Danh sách loại món ăn cho Dropdown
   bool _isLoading = true;
 
   @override
@@ -27,10 +33,19 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    _monAnList = await _dbHelper.getAllMonAn();
-    _filteredMonAnList = _monAnList;
-    _loaiMonAnList = await _dbHelper.getAllLoaiMonAn();
-    setState(() => _isLoading = false);
+    try {
+      _monAnList = await _dbHelper.getAllMonAn();
+      _filteredMonAnList = _monAnList;
+      _loaiMonAnList = await _dbHelper.getAllLoaiMonAn();
+      print('DEBUG: Loaded LoaiMonAnList: $_loaiMonAnList'); // Kiểm tra dữ liệu
+    } catch (e) {
+      debugPrint('Lỗi khi tải dữ liệu món ăn hoặc loại món ăn: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi khi tải dữ liệu: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _filterMonAn() {
@@ -45,29 +60,53 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
   }
 
   Future<void> _showAddEditDialog({Map<String, dynamic>? monAn}) async {
+    final bool isEditing = monAn != null;
+    final TextEditingController maMonController = TextEditingController(
+      text: isEditing ? monAn['ma_mon'] : '', // Lấy ma_mon
+    );
     final TextEditingController tenController = TextEditingController(
       text: monAn?['ten_mon'],
     );
     final TextEditingController donGiaController = TextEditingController(
-      text: monAn?['don_gia'].toString(),
+      text: monAn?['don_gia']?.toString(),
     );
     String? selectedLoaiMonAn = monAn?['ma_loai'];
     final TextEditingController hinhController = TextEditingController(
       text: monAn?['hinh'],
     );
 
+    // Tạo mã món mới nếu thêm mới
+    if (!isEditing) {
+      final nextIdNum = await _dbHelper.getNextMaMonAn(); // Giả sử có hàm này
+      maMonController.text =
+          'MA${nextIdNum.toString().padLeft(2, '0')}'; // MA001, MA002...
+    }
+
     await showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: Text(
-              monAn == null ? 'Thêm Món Ăn' : 'Sửa Món Ăn',
+              isEditing ? 'Sửa Món Ăn' : 'Thêm Món Ăn',
               style: TextStyle(color: Color(0xFFE91E63)),
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  TextField(
+                    controller: maMonController,
+                    readOnly: true, // Mã món ăn không cho chỉnh sửa
+                    decoration: InputDecoration(
+                      labelText: 'Mã món ăn',
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: tenController,
                     decoration: InputDecoration(
@@ -107,18 +146,27 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                         _loaiMonAnList
                             .map(
                               (loai) => DropdownMenuItem(
-                                value: loai['ma_loai'],
-                                child: Text(loai['ten_loai']),
+                                value:
+                                    loai['ma_loai']
+                                        as String, // Đảm bảo kiểu String
+                                child: Text(
+                                  loai['ten_loai'] as String,
+                                ), // Đảm bảo kiểu String
                               ),
                             )
                             .toList(),
-                    onChanged: (value) => selectedLoaiMonAn = value,
+                    onChanged: (value) {
+                      setState(() {
+                        // Cập nhật state của dialog
+                        selectedLoaiMonAn = value;
+                      });
+                    },
                   ),
                   SizedBox(height: 10),
                   TextField(
                     controller: hinhController,
                     decoration: InputDecoration(
-                      labelText: 'Tên file hình ảnh',
+                      labelText: 'Tên file hình ảnh (VD: burger.png)',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -134,7 +182,8 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                 onPressed: () => Navigator.pop(context),
                 child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
               ),
-              TextButton(
+              ElevatedButton(
+                // Dùng ElevatedButton cho nút lưu
                 onPressed: () async {
                   if (tenController.text.isEmpty ||
                       donGiaController.text.isEmpty ||
@@ -148,40 +197,109 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                     return;
                   }
 
-                  final newMonAn = {
-                    'ma_mon_an':
-                        monAn?['ma_mon_an'] ??
-                        'MA${DateTime.now().millisecondsSinceEpoch}',
-                    'ten_mon': tenController.text,
-                    'don_gia': double.parse(donGiaController.text),
+                  final newMonAnData = {
+                    // Đổi tên biến để tránh nhầm lẫn
+                    'ma_mon': maMonController.text, // Sử dụng ma_mon
                     'ma_loai': selectedLoaiMonAn,
-                    'hinh': hinhController.text,
+                    'ten_mon': tenController.text,
+                    'don_gia': double.tryParse(donGiaController.text) ?? 0.0,
+                    'hinh':
+                        hinhController.text.isNotEmpty
+                            ? hinhController.text
+                            : null,
+                    // Có thể thêm các trường khác nếu cần, ví dụ:
+                    // 'noi_dung_tom_tat': '...',
+                    // 'noi_dung_chi_tiet': '...',
+                    // 'ngay_cap_nhat': DateTime.now().toIso8601String(),
                   };
 
-                  if (monAn == null) {
-                    await _dbHelper.insertMonAn(newMonAn);
-                  } else {
-                    await _dbHelper.updateMonAn(newMonAn);
-                  }
+                  try {
+                    if (isEditing) {
+                      await _dbHelper.updateMonAn(newMonAnData);
+                    } else {
+                      await _dbHelper.insertMonAn(newMonAnData);
+                    }
 
-                  _loadData();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        monAn == null
-                            ? 'Thêm món ăn thành công.'
-                            : 'Cập nhật món ăn thành công.',
+                    _loadData(); // Tải lại dữ liệu
+                    Navigator.pop(context); // Đóng dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEditing
+                              ? 'Cập nhật món ăn thành công.'
+                              : 'Thêm món ăn thành công.',
+                        ),
+                        backgroundColor: Colors.green,
                       ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                    );
+                  } catch (e) {
+                    debugPrint('Lỗi khi lưu món ăn: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi khi lưu món ăn: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
-                child: Text('Lưu', style: TextStyle(color: Color(0xFFE91E63))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFE91E63),
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Lưu'),
               ),
             ],
           ),
     );
+  }
+
+  Future<void> _deleteMonAn(String maMon) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Color(0xFFE91E63)),
+            ),
+            content: Text('Bạn có chắc muốn xóa món ăn này?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
+              ),
+              ElevatedButton(
+                // Dùng ElevatedButton
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Xóa', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+    );
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteMonAn(maMon);
+        _loadData();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa món ăn.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Lỗi khi xóa món ăn: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi xóa món ăn: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -233,6 +351,7 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                       itemCount: _filteredMonAnList.length,
                       itemBuilder: (context, index) {
                         final monAn = _filteredMonAnList[index];
+                        // Tìm loại món ăn từ danh sách _loaiMonAnList đã tải
                         final loaiMonAn = _loaiMonAnList.firstWhere(
                           (loai) => loai['ma_loai'] == monAn['ma_loai'],
                           orElse: () => {'ten_loai': 'Không xác định'},
@@ -252,13 +371,18 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                               backgroundImage: AssetImage(
                                 'assets/HinhAnh/MonAn/${monAn['hinh'] ?? 'default_food.png'}',
                               ),
+                              onBackgroundImageError: (exception, stackTrace) {
+                                debugPrint(
+                                  'Lỗi tải ảnh món ăn: ${monAn['hinh'] ?? 'default_food.png'}, Lỗi: $exception',
+                                );
+                              },
                             ),
                             title: Text(
                               monAn['ten_mon'] ?? 'Chưa có tên',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              'Loại: ${loaiMonAn['ten_loai']}\nGiá: ${monAn['don_gia'].toStringAsFixed(2)} VNĐ',
+                              'Loại: ${loaiMonAn['ten_loai']}\nGiá: ${monAn['don_gia']?.toStringAsFixed(2) ?? 'N/A'} VNĐ',
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -272,7 +396,9 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                                     Provider.of<CartController>(
                                       context,
                                       listen: false,
-                                    ).addItem(MonAn.fromMap(monAn));
+                                    ).addItem(
+                                      MonAn.fromMap(monAn),
+                                    ); // monAn là Map, cần fromMap
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text('Đã thêm vào giỏ hàng.'),
@@ -289,63 +415,9 @@ class _QuanLyMonAnPageState extends State<QuanLyMonAnPage> {
                                 IconButton(
                                   icon: Icon(Icons.delete, color: Colors.red),
                                   onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder:
-                                          (context) => AlertDialog(
-                                            title: Text(
-                                              'Xác nhận xóa',
-                                              style: TextStyle(
-                                                color: Color(0xFFE91E63),
-                                              ),
-                                            ),
-                                            content: Text(
-                                              'Bạn có chắc muốn xóa món ăn này?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      false,
-                                                    ),
-                                                child: Text(
-                                                  'Hủy',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFE91E63),
-                                                  ),
-                                                ),
-                                              ),
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      true,
-                                                    ),
-                                                child: Text(
-                                                  'Xóa',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFE91E63),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                    );
-                                    if (confirm == true) {
-                                      await _dbHelper.deleteMonAn(
-                                        monAn['ma_mon_an'],
-                                      );
-                                      _loadData();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Đã xóa món ăn.'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
+                                    await _deleteMonAn(
+                                      monAn['ma_mon'],
+                                    ); // Sửa thành ma_mon
                                   },
                                 ),
                               ],

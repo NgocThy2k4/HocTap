@@ -1,8 +1,9 @@
 // views/admin/QuanLyKhachHangPage.dart
 import 'package:flutter/material.dart';
-import 'package:sqlite3/sqlite3.dart';
+// import 'package:sqlite3/sqlite3.dart'; // Thường không cần import này trực tiếp
 import '../../database/DatabaseHelper.dart';
 import '../../models/KhachHang.dart';
+import 'package:flutter/services.dart'; // Cho TextInputFormatter nếu cần
 
 class QuanLyKhachHangPage extends StatefulWidget {
   @override
@@ -25,11 +26,18 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
 
   Future<void> _loadKhachHang() async {
     setState(() => _isLoading = true);
-    final db = await _dbHelper.database;
-    final result = await db.query('khach_hang');
-    _khachHangList = result.map((map) => KhachHang.fromMap(map)).toList();
-    _filteredKhachHangList = _khachHangList;
-    setState(() => _isLoading = false);
+    try {
+      // Sử dụng hàm getAllKhachHang đã có sẵn trong DatabaseHelper
+      _khachHangList = await _dbHelper.getAllKhachHang();
+      _filteredKhachHangList = List.from(_khachHangList); // Tạo bản sao
+    } catch (e) {
+      debugPrint('Lỗi khi tải danh sách khách hàng: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi khi tải dữ liệu: $e')));
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _filterKhachHang() {
@@ -37,13 +45,19 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
     setState(() {
       _filteredKhachHangList =
           _khachHangList.where((kh) {
-            final ten = kh.tenKhachHang?.toLowerCase() ?? '';
-            return ten.contains(query);
+            final ten =
+                kh.tenKhachHang.toLowerCase(); // tenKhachHang là required
+            final ma = kh.maKhachHang.toLowerCase(); // Thêm tìm kiếm theo mã
+            return ten.contains(query) || ma.contains(query);
           }).toList();
     });
   }
 
   Future<void> _showAddEditDialog({KhachHang? khachHang}) async {
+    final bool isEditing = khachHang != null;
+    final TextEditingController maController = TextEditingController(
+      text: isEditing ? khachHang.maKhachHang : '',
+    );
     final TextEditingController tenController = TextEditingController(
       text: khachHang?.tenKhachHang,
     );
@@ -57,18 +71,41 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
       text: khachHang?.ghiChu,
     );
 
+    // Tạo mã mới nếu thêm khách hàng
+    if (!isEditing) {
+      final nextIdNum = await _dbHelper.getNextMaNguoiDung(
+        'KH',
+      ); // Sử dụng hàm đã có
+      maController.text =
+          'KH${nextIdNum.toString().padLeft(2, '0')}'; // Định dạng KH01, KH02...
+    }
+
     await showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: Text(
-              khachHang == null ? 'Thêm Khách Hàng' : 'Sửa Khách Hàng',
+              isEditing ? 'Sửa Khách Hàng' : 'Thêm Khách Hàng',
               style: TextStyle(color: Color(0xFFE91E63)),
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  TextField(
+                    controller: maController,
+                    readOnly: true, // Mã khách hàng không cho phép chỉnh sửa
+                    decoration: InputDecoration(
+                      labelText: 'Mã khách hàng',
+                      filled: true,
+                      fillColor:
+                          Colors.grey[200], // Màu nền xám cho trường readOnly
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10),
                   TextField(
                     controller: tenController,
                     decoration: InputDecoration(
@@ -104,10 +141,13 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
+                    // Có thể thêm inputFormatters nếu muốn chỉ nhập số
+                    // inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   SizedBox(height: 10),
                   TextField(
                     controller: ghiChuController,
+                    maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'Ghi chú',
                       filled: true,
@@ -125,7 +165,8 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                 onPressed: () => Navigator.pop(context),
                 child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
               ),
-              TextButton(
+              ElevatedButton(
+                // Dùng ElevatedButton để làm nổi bật nút Lưu
                 onPressed: () async {
                   if (tenController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -138,49 +179,105 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                   }
 
                   final newKhachHang = KhachHang(
-                    maKhachHang:
-                        khachHang?.maKhachHang ??
-                        'KH${DateTime.now().millisecondsSinceEpoch}',
+                    maKhachHang: maController.text, // Lấy mã từ controller
                     tenKhachHang: tenController.text,
                     diaChi: diaChiController.text,
                     dienThoai: dienThoaiController.text,
-                    hinhAnh: khachHang?.hinhAnh ?? 'default_khach_hang.jpg',
+                    hinhAnh:
+                        khachHang?.hinhAnh ??
+                        'default_khach_hang.jpg', // Giữ nguyên ảnh hoặc gán default
                     ghiChu: ghiChuController.text,
                   );
 
-                  if (khachHang == null) {
-                    await _dbHelper.insertKhachHang(newKhachHang.toMap());
-                  } else {
-                    await _dbHelper.updateKhachHang(newKhachHang.toMap());
-                  }
+                  try {
+                    if (isEditing) {
+                      await _dbHelper.updateKhachHang(newKhachHang.toMap());
+                    } else {
+                      await _dbHelper.insertKhachHang(newKhachHang.toMap());
+                    }
 
-                  _loadKhachHang();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        khachHang == null
-                            ? 'Thêm khách hàng thành công.'
-                            : 'Cập nhật khách hàng thành công.',
+                    _loadKhachHang(); // Tải lại danh sách sau khi cập nhật
+                    Navigator.pop(context); // Đóng dialog
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isEditing
+                              ? 'Cập nhật khách hàng thành công.'
+                              : 'Thêm khách hàng thành công.',
+                        ),
+                        backgroundColor: Colors.green,
                       ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                    );
+                  } catch (e) {
+                    debugPrint('Lỗi khi lưu khách hàng: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi khi lưu khách hàng: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
-                child: Text('Lưu', style: TextStyle(color: Color(0xFFE91E63))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFFFB2D9), // Màu hồng cho nút Lưu
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Lưu'),
               ),
             ],
           ),
     );
   }
 
-  Future<void> insertKhachHang(Map<String, dynamic> khachHang) async {
-    final db = await database;
-    await db.insert(
-      'khach_hang',
-      khachHang,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+  Future<void> _deleteKhachHang(String maKhachHang) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Color(0xFFE91E63)),
+            ),
+            content: Text('Bạn có chắc muốn xóa khách hàng này?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Hủy', style: TextStyle(color: Color(0xFFE91E63))),
+              ),
+              ElevatedButton(
+                // Dùng ElevatedButton cho nút Xóa
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, // Màu đỏ cho nút Xóa
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Xóa'),
+              ),
+            ],
+          ),
     );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteKhachHang(maKhachHang);
+        _loadKhachHang(); // Tải lại danh sách
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa khách hàng.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Lỗi khi xóa khách hàng: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi xóa khách hàng: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -247,15 +344,21 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                               backgroundImage: AssetImage(
                                 'assets/HinhAnh/KhachHang/${kh.hinhAnh ?? 'default_khach_hang.jpg'}',
                               ),
+                              onBackgroundImageError: (exception, stackTrace) {
+                                debugPrint(
+                                  'Lỗi tải ảnh khách hàng: ${kh.hinhAnh ?? 'default_khach_hang.jpg'}, Lỗi: $exception',
+                                );
+                              },
                             ),
                             title: Text(
-                              kh.tenKhachHang ?? 'Chưa có tên',
+                              kh.tenKhachHang, // Đảm bảo tenKhachHang không null
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
                               '${kh.dienThoai ?? ''}\n${kh.diaChi ?? ''}',
                             ),
                             trailing: Row(
+                              // <-- KHÔNG CÒN LỖI ĐỎ Ở ĐÂY NỮA
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
@@ -266,63 +369,7 @@ class _QuanLyKhachHangPageState extends State<QuanLyKhachHangPage> {
                                 IconButton(
                                   icon: Icon(Icons.delete, color: Colors.red),
                                   onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder:
-                                          (context) => AlertDialog(
-                                            title: Text(
-                                              'Xác nhận xóa',
-                                              style: TextStyle(
-                                                color: Color(0xFFE91E63),
-                                              ),
-                                            ),
-                                            content: Text(
-                                              'Bạn có chắc muốn xóa khách hàng này?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      false,
-                                                    ),
-                                                child: Text(
-                                                  'Hủy',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFE91E63),
-                                                  ),
-                                                ),
-                                              ),
-                                              TextButton(
-                                                onPressed:
-                                                    () => Navigator.pop(
-                                                      context,
-                                                      true,
-                                                    ),
-                                                child: Text(
-                                                  'Xóa',
-                                                  style: TextStyle(
-                                                    color: Color(0xFFE91E63),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                    );
-                                    if (confirm == true) {
-                                      await _dbHelper.deleteKhachHang(
-                                        kh.maKhachHang,
-                                      );
-                                      _loadKhachHang();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Đã xóa khách hàng.'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
+                                    await _deleteKhachHang(kh.maKhachHang);
                                   },
                                 ),
                               ],
