@@ -18,8 +18,8 @@
 ### 👥 Thành viên thực hiện
 | Vai trò | Họ và tên | MSSV | Lớp |
 | :--- | :--- | :--- | :--- |
-| **Sinh viên thực hiện** | [Tên sinh viên] | [Mã số sinh viên] | [Tên lớp] |
-| **Giảng viên hướng dẫn** | [Tên giảng viên] | - | [Bộ môn / Khoa] |
+| **Sinh viên thực hiện** | Ngọc Thy | 20012253.. | 13DHTH04 |
+| **Giảng viên hướng dẫn** | Đỗ Gia bảo | - | Lập trình di động  - Flutter  |
 
 ---
 
